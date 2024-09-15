@@ -1,17 +1,24 @@
+#include <iomanip>
+#include <iostream>
 #include "graph_search.h"
 
 GraphSearch::GraphSearch(std::list<Rule> rules, int srcNode, int dstNode)
     : m_rules(std::move(rules)), m_dstNode(dstNode)
 {
-    for (auto rule : m_rules) {
-        m_nodes[rule.srcNode] = { .number = rule.srcNode };
-        m_nodes[rule.dstNode] = { .number = rule.dstNode };
+    if (srcNode == dstNode)
+        m_foundSolution = true;
+    else {
+        for (auto rule : m_rules) {
+            m_nodes[rule.srcNode] = { .number = rule.srcNode };
+            m_nodes[rule.dstNode] = { .number = rule.dstNode };
+        }
+        m_openNodes.push_back(srcNode);
     }
-    m_openNodes.push_back(srcNode);
 }
 
 std::list<int> GraphSearch::DoDepthFirstSearch()
 {
+    ShowState(true);
     while (!m_foundSolution && !m_noSolution) {
         /* достаем вершину из списка открытых вершин (стек) */
         int node = m_openNodes.back();
@@ -26,6 +33,7 @@ std::list<int> GraphSearch::DoDepthFirstSearch()
         }
         else if (m_openNodes.empty())
             m_noSolution = true;
+        ShowState();
     }
     if (m_noSolution)
         return {};
@@ -36,10 +44,10 @@ std::list<int> GraphSearch::DoDepthFirstSearch()
         for (auto rule : m_rules) {
             if (rule.srcNode == *node && rule.dstNode == lastNode) {
                 solution.push_front(rule.number);
+                lastNode = *node;
                 break;
             }
         }
-        lastNode = *node;
     }
     return solution;
 }
@@ -74,6 +82,7 @@ std::list<int> GraphSearch::DoBreadthFirstSearch()
         - иначе, если число потомков 0 и список открытых вершин пуст - то сбрасываем в 0
             флаг "нет решения" и выходим из цикла
     */
+    ShowState(true);
     while (!m_foundSolution && !m_noSolution) {
         int node = m_openNodes.front();
         int count = DescendantsBFS(node);
@@ -84,6 +93,7 @@ std::list<int> GraphSearch::DoBreadthFirstSearch()
             m_closedNodes.push_back(node);
         else if (m_openNodes.empty())
             m_noSolution = true;
+        ShowState();
     }
     if (m_noSolution)
         return {};
@@ -141,4 +151,35 @@ int GraphSearch::DescendantsBFS(int node)
         ++count;
     }
     return count;
+}
+
+void GraphSearch::ShowState(bool header)
+{
+    if (header)
+        std::cout
+            << "  open nodes  | closed nodes " << std::endl
+            << "--------------+--------------" << std::endl;
+    const size_t rows = std::max((3 + m_openNodes.size()) / 4, (3 + m_closedNodes.size()) / 4);
+    for (size_t row = 0; row < rows; ++row) {
+        std::cout << " ";
+        for (size_t i = 4 * row; i < 4 * (row + 1); ++i) {
+            if (i < m_openNodes.size()) {
+                auto it = m_openNodes.begin();
+                std::advance(it, i);
+                std::cout << std::setw(3) << *it;
+            } else
+                std::cout << "   ";
+        }
+        std::cout << " | ";
+        for (size_t i = 4 * row; i < 4 * (row + 1); ++i) {
+            if (i < m_closedNodes.size()) {
+                auto it = m_closedNodes.begin();
+                std::advance(it, i);
+                std::cout << std::setw(3) << *it;
+            } else
+                std::cout << "   ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "--------------+--------------" << std::endl;
 }

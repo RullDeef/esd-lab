@@ -23,6 +23,9 @@ private:
     /* метод потомки для поиска в ширину */
     int DescendantsBFS(int node);
 
+    /* отладочная печать состояния поиска */
+    void ShowState(bool header = false);
+
     std::list<Rule> m_rules;
     std::map<int, Node> m_nodes;
     std::list<int> m_openNodes;
