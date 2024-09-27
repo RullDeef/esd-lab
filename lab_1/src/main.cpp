@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
   std::shared_ptr<Dictionary> database;
   try {
     database = std::make_shared<Dictionary>(databaseFilename);
-  } catch (std::exception e) {
+  } catch (const std::exception &e) {
     std::cerr << "failed to load database \"" << databaseFilename << "\""
               << std::endl;
     return 1;

@@ -1,3 +1,6 @@
 .vscode
 .cache
 build
+obj
+out
+

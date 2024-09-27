@@ -8,8 +8,8 @@ GraphSearch::GraphSearch(std::list<Rule> rules, int srcNode, int dstNode)
     m_foundSolution = true;
   else {
     for (auto rule : m_rules) {
-      m_nodes[rule.srcNode] = {.number = rule.srcNode};
-      m_nodes[rule.dstNode] = {.number = rule.dstNode};
+      m_nodes[rule.srcNode] = {rule.srcNode};
+      m_nodes[rule.dstNode] = {rule.dstNode};
     }
     m_openNodes.push_back(srcNode);
   }
