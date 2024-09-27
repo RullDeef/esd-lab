@@ -1,9 +1,8 @@
 #pragma once
 
-struct Rule
-{
-    int srcNode;
-    int dstNode;
-    int number;
-    bool visited = false;
+struct Rule {
+  int srcNode;
+  int dstNode;
+  int number;
+  bool visited = false;
 };

@@ -1,7 +1,6 @@
 #pragma once
 
-struct Node
-{
-    int number;
-    bool forbidden = false;
+struct Node {
+  int number;
+  bool forbidden = false;
 };

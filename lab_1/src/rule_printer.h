@@ -1,15 +1,14 @@
 #pragma once
 
-#include <memory>
 #include "dict.h"
+#include <memory>
 
-class RulePrinter
-{
+class RulePrinter {
 public:
-    explicit RulePrinter(std::shared_ptr<Dictionary> dictionary);
+  explicit RulePrinter(std::shared_ptr<Dictionary> dictionary);
 
-    void PrintRule(Rule rule) const;
+  void PrintRule(Rule rule) const;
 
 private:
-    std::shared_ptr<Dictionary> m_dict;
+  std::shared_ptr<Dictionary> m_dict;
 };
