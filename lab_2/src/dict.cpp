@@ -3,6 +3,7 @@
 #include <fstream>
 
 constexpr auto ruleStart = "Если ";
+constexpr auto ruleAnd = " и ";
 constexpr auto ruleMiddle = ", то ";
 constexpr auto ruleEnd = ".";
 
@@ -45,7 +46,7 @@ void Dictionary::Load(const char *filename) {
 
 void Dictionary::AddRule(std::string precondition, std::string conclusion) {
   Rule rule;
-  rule.srcNode = ParsePrecondition(precondition);
+  rule.srcNodes = std::move(ParsePrecondition(precondition.c_str()));
   if (m_factsInverse.count(conclusion) == 0)
     m_factsInverse[conclusion] = 1 + m_factsInverse.size();
   rule.dstNode = m_factsInverse[conclusion];
@@ -53,8 +54,25 @@ void Dictionary::AddRule(std::string precondition, std::string conclusion) {
   m_rules.push_back(rule);
 }
 
-int Dictionary::ParsePrecondition(const std::string &precondition) {
-  if (m_factsInverse.count(precondition) == 0)
-    m_factsInverse[precondition] = 1 + m_factsInverse.size();
-  return m_factsInverse[precondition];
+static std::vector<std::string> split(std::string s, const std::string& delimiter) {
+    std::vector<std::string> tokens;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        tokens.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+    tokens.push_back(s);
+    return tokens;
+}
+
+std::vector<int> Dictionary::ParsePrecondition(const char *precondition) {
+  std::vector<int> res;
+  for (const auto &cond : split(precondition, ruleAnd)) {
+    if (m_factsInverse.count(cond) == 0)
+      m_factsInverse[cond] = 1 + m_factsInverse.size();
+    res.push_back(m_factsInverse[cond]);
+  }
+  return res;
 }

@@ -4,6 +4,7 @@
 #include <list>
 #include <map>
 #include <string>
+#include <vector>
 
 class Dictionary {
 public:
@@ -16,7 +17,7 @@ public:
 private:
   void Load(const char *filename);
   void AddRule(std::string precondition, std::string conclusion);
-  int ParsePrecondition(const std::string &precondition);
+  std::vector<int> ParsePrecondition(const char *precondition);
 
   std::map<int, std::string> m_facts;
   std::map<std::string, int> m_factsInverse;

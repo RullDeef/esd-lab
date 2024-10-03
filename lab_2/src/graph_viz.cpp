@@ -8,12 +8,18 @@ constexpr auto tmpFilename = ".tmp.graph.dot";
 GraphViz &GraphViz::DefineGraph(const std::list<Rule> &rules) {
   std::set<int> nodes;
   for (const auto &rule : rules) {
-    nodes.insert(rule.srcNode);
+    for (auto node : rule.srcNodes) {
+      nodes.insert(node);
+      std::stringstream ss;
+      ss << "    Node" << node << " -> Rule" << rule.number
+         << " [arrowsize = 0.5];\n";
+      m_graphDefinitions.push_back(ss.str());
+    }
     nodes.insert(rule.dstNode);
     {
       std::stringstream ss;
-      ss << "    Node" << rule.srcNode << " -> Rule" << rule.number
-         << " -> Node" << rule.dstNode << " [arrowsize = 0.5];\n";
+      ss << "    Rule" << rule.number << " -> Node" << rule.dstNode
+         << " [arrowsize = 0.5];\n";
       m_graphDefinitions.push_back(ss.str());
     }
     {

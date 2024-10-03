@@ -11,23 +11,19 @@
 constexpr auto defaultDatabaseFilename = "database.txt";
 
 int main(int argc, char **argv) {
-  int srcNode = -1;
+  std::vector<int> srcNodes;
   int dstNode = -1;
   const char *svgFilename = NULL;
   const char *databaseFilename = defaultDatabaseFilename;
   bool verboseImport = false;
-  bool onlyDFS = false;
-  bool onlyBFS = false;
 
   constexpr auto helpMessage =
-      R"( [-i database.txt] [-v] [-o output.svg] [--only-dfs] [--only-bfs] <srcNode> <dstNode>
+      R"( [-i database.txt] [-v] [-o output.svg] <srcNodes> <dstNode>
 
     -i database.txt load database from given file (default: database.txt)
     -v              print verbose information about imported database
     -o output.svg   export database as SVG image graph with graphviz
-    --only-dfs      run only depth first search
-    --only-bfs      run only breadth first search
-    <srcNode>       number of start node (default: random)
+    <srcNodes>      numbers of start nodes (default: 1 random)
     <dstNode>       number of destination node (default: random)
 )";
 
@@ -43,28 +39,14 @@ int main(int argc, char **argv) {
       verboseImport = true;
     } else if (!strcmp(argv[i], "-o")) {
       svgFilename = argv[++i];
-    } else if (!strcmp(argv[i], "--only-dfs")) {
-      onlyDFS = true;
-    } else if (!strcmp(argv[i], "--only-bfs")) {
-      onlyBFS = true;
-    } else if (i == argc - 2) {
-      srcNode = atoi(argv[i]);
+    } else if (i < argc - 1) {
+      srcNodes.push_back(atoi(argv[i]));
     } else if (i == argc - 1) {
       dstNode = atoi(argv[i]);
     } else {
       std::cout << argv[0] << helpMessage;
       return 0;
     }
-  }
-
-  if (onlyDFS && onlyBFS) {
-    std::cerr << "--only-dfs and --only-bfs options are mutually exclusive"
-              << std::endl;
-    return -1;
-  }
-  if (!onlyDFS && !onlyBFS) {
-    onlyDFS = true;
-    onlyBFS = true;
   }
 
   std::shared_ptr<Dictionary> database;
@@ -83,48 +65,31 @@ int main(int argc, char **argv) {
     std::cout << "-----------------------" << std::endl;
   }
 
-  if (srcNode == -1) {
-    srcNode = rand() % database->FactsCount();
+  if (srcNodes.empty()) {
+    srcNodes.push_back(rand() % database->FactsCount());
   }
   if (dstNode == -1) {
     dstNode = rand() % database->FactsCount();
   }
 
-  std::cout << "start node: " << srcNode << ", end node: " << dstNode
-            << std::endl;
+  std::cout << "start nodes:";
+  for (auto node : srcNodes)
+    std::cout << ' ' << node;
+  std::cout << ", end node: " << dstNode << std::endl;
 
-  if (onlyDFS) {
-    GraphSearch gs(database->Rules(), srcNode, dstNode);
-    auto rulesDFS = gs.DoDepthFirstSearch();
+  GraphSearch gs(database->Rules(), srcNodes, dstNode);
+  auto rulesDFS = gs.DoDepthFirstSearch();
 
-    std::cout << "DFS: ";
-    for (auto rule : rulesDFS)
-      std::cout << rule << " -> ";
-    std::cout << std::endl << "-----------------------------" << std::endl;
+  std::cout << "DFS: ";
+  for (auto rule : rulesDFS)
+    std::cout << rule << " -> ";
+  std::cout << std::endl << "-----------------------------" << std::endl;
 
-    if (svgFilename) {
-      GraphViz()
-          .DefineGraph(database->Rules())
-          .DrawPath(rulesDFS)
-          .Export(svgFilename);
-    }
-  }
-
-  if (onlyBFS) {
-    GraphSearch gs(database->Rules(), srcNode, dstNode);
-    auto rulesBFS = gs.DoBreadthFirstSearch();
-
-    std::cout << "BFS: ";
-    for (auto rule : rulesBFS)
-      std::cout << rule << " -> ";
-    std::cout << std::endl << "-----------------------------" << std::endl;
-
-    if (svgFilename) {
-      GraphViz()
-          .DefineGraph(database->Rules())
-          .DrawPath(rulesBFS)
-          .Export(svgFilename);
-    }
+  if (svgFilename) {
+    GraphViz()
+        .DefineGraph(database->Rules())
+        .DrawPath(rulesDFS)
+        .Export(svgFilename);
   }
 
   return 0;

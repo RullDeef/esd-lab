@@ -17,16 +17,19 @@ private:
   int DescendantsDFS(int node);
 
   /* текущая вершина запрещается */
-  void Backtrack();
+  void Backtrack(int node);
 
+  void Mark(int node);
   /* отладочная печать состояния поиска */
   void ShowState(bool header = false);
 
   std::list<Rule> m_rules;
   std::map<int, Node> m_nodes;
+  std::map<int, Rule *> m_rulesRef;
   std::list<int> m_openNodes;
   std::list<int> m_openRules;
   std::list<int> m_closedNodes;
+  std::list<int> m_closedRules;
   std::vector<int> m_srcNodes;
   bool m_foundSolution = false;
   bool m_noSolution = false;
