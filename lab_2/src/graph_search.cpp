@@ -24,17 +24,20 @@ std::list<int> GraphSearch::DoDepthFirstSearch() {
   while (!m_foundSolution && !m_noSolution) {
     int node = m_openNodes.back();
     int count = DescendantsDFS(node);
+    ShowState();
     if (m_foundSolution) {
       Mark(node);
+      ShowState();
       if (m_foundSolution)
         break;
-    } else if (count == 0 && !m_openNodes.empty())
+    } else if (count == 0 && !m_openNodes.empty()) {
       Backtrack(node);
+      ShowState();
+    }
     else if (m_openNodes.empty()) {
       m_noSolution = true;
       break;
     }
-    ShowState();
   }
   if (m_noSolution)
     return {};
@@ -61,7 +64,7 @@ int GraphSearch::DescendantsDFS(int node) {
     m_openRules.push_back(rule.number);
     /* check that all inputs satisfied */
     if (all_closed) {
-      m_closedRules.push_back(rule.number);
+      // m_closedRules.push_back(rule.number);
       m_foundSolution = true;
       break;
     }
@@ -79,6 +82,10 @@ void GraphSearch::Backtrack(int node) {
   // node at top of open node stack needs to be forbidden
   m_nodes[node].forbidden = true;
   // then rule at top of open rules stack needs to be forbidden
+  if (m_openRules.empty()) {
+    m_noSolution = true;
+    return;
+  }
   int ruleNum = m_openRules.back();
   auto ruleRef = m_rulesRef[ruleNum];
   int dstNode = ruleRef->dstNode;
@@ -91,6 +98,7 @@ void GraphSearch::Backtrack(int node) {
       break;
     }
   }
+  m_openRules.pop_back();
   // new open rule must be searched to close previous node in open stack
   // 1. check if previous open rule resolves current top of open nodes
   // 2. if true - continue with this rule
@@ -108,12 +116,16 @@ void GraphSearch::Mark(int node) {
   // 3. dont forget to update m_foundSolution variable if real solution was
   // found!
   m_nodes[node].closed = true;
+  m_closedRules.push_back(m_openRules.back());
   while (!m_openRules.empty() &&
          m_rulesRef[m_openRules.back()]->dstNode == node)
     m_openRules.pop_back();
   // real solution found
   if (m_openRules.empty())
     return;
+  // remove all open nodes up until given node
+  while (m_openNodes.back() != node)
+    m_openNodes.pop_back();
   m_openNodes.pop_back();
   // check current top
   int rule = m_openRules.back();

@@ -38,6 +38,24 @@ GraphViz &GraphViz::DefineGraph(const std::list<Rule> &rules) {
   return *this;
 }
 
+GraphViz &GraphViz::DrawSourceNodes(const std::vector<int>& sourceNodes) {
+  for (const auto&node : sourceNodes) {
+    std::stringstream ss;
+    ss << "    Node" << node
+       << " [style = filled, color = blue, fillcolor = lightblue];\n";
+    m_graphDefinitions.push_back(ss.str());
+  }
+  return *this;
+}
+
+GraphViz &GraphViz::DrawDestinationNode(int node) {
+  std::stringstream ss;
+  ss << "    Node" << node
+     << " [style = filled, color = red, fillcolor = lightgreen];\n";
+  m_graphDefinitions.push_back(ss.str());
+  return *this;
+}
+
 GraphViz &GraphViz::DrawPath(const std::list<int> &ruleNumbers) {
   for (const auto &rule : ruleNumbers) {
     std::stringstream ss;
