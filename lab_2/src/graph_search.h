@@ -12,6 +12,11 @@ public:
   /* запуск поиска в графе в глубину от цели */
   std::list<int> DoDepthFirstSearch();
 
+  const std::list<int> &GetClosedNodes() const { return m_closedNodes; }
+  const std::list<int> &GetClosedRules() const { return m_closedRules; }
+  std::list<int> GetForbiddenNodes() const;
+  std::list<int> GetForbiddenRules() const;
+
 private:
   /* метод потомки для поиска в глубину */
   int DescendantsDFS(int node);

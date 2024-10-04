@@ -8,5 +8,5 @@ struct Rule {
   int number;
   bool visited = false;
   bool forbidden = false;
-  int openIndex = 0; // size of opened nodes stack at rule open
+  unsigned int openIndex = 0;
 };

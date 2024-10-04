@@ -88,9 +88,12 @@ int main(int argc, char **argv) {
   if (svgFilename) {
     GraphViz()
         .DefineGraph(database->Rules())
+        .DrawClosedNodes(gs.GetClosedNodes())
         .DrawSourceNodes(srcNodes)
+        .DrawForbiddenNodes(gs.GetForbiddenNodes())
         .DrawDestinationNode(dstNode)
-        .DrawPath(rulesDFS)
+        .DrawForbiddenRules(gs.GetForbiddenRules())
+        .DrawPath(gs.GetClosedRules())
         .Export(svgFilename);
   }
 

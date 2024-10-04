@@ -3,7 +3,7 @@
 
 TEST(DFS, SameSourceAndTarget) {
   std::list<Rule> rules = {
-      Rule{{1}, 1, 100},
+      {{1}, 1, 100},
   };
   GraphSearch gs(std::move(rules), {1}, 1);
 
@@ -15,9 +15,9 @@ TEST(DFS, SameSourceAndTarget) {
 
 TEST(DFS, SimpleLinearPath) {
   std::list<Rule> rules = {
-      Rule{{3}, 4, 102},
-      Rule{{1}, 2, 100},
-      Rule{{2}, 3, 101},
+      {{3}, 4, 102},
+      {{1}, 2, 100},
+      {{2}, 3, 101},
   };
   GraphSearch gs(std::move(rules), {1}, 4);
 
@@ -29,9 +29,9 @@ TEST(DFS, SimpleLinearPath) {
 
 TEST(DFS, SimpleNoSolution) {
   std::list<Rule> rules = {
-      Rule{{3}, 4, 102},
-      Rule{{1}, 2, 100},
-      Rule{{2}, 3, 101},
+      {{3}, 4, 102},
+      {{1}, 2, 100},
+      {{2}, 3, 101},
   };
   GraphSearch gs(std::move(rules), {4}, 1);
 
@@ -43,10 +43,10 @@ TEST(DFS, SimpleNoSolution) {
 
 TEST(DFS, SimpleLoopNoSolution) {
   std::list<Rule> rules = {
-      Rule{{1}, 2, 100},
-      Rule{{2}, 3, 101},
-      Rule{{3}, 1, 102},
-      Rule{{4}, 2, 103},
+      {{1}, 2, 100},
+      {{2}, 3, 101},
+      {{3}, 1, 102},
+      {{4}, 2, 103},
   };
   GraphSearch gs(std::move(rules), {1}, 4);
 
@@ -58,8 +58,7 @@ TEST(DFS, SimpleLoopNoSolution) {
 
 TEST(DFS, NotOptimalPath) {
   std::list<Rule> rules = {
-      Rule{{1}, 4, 103}, Rule{{4}, 5, 104}, Rule{{2}, 3, 101},
-      Rule{{3}, 5, 102}, Rule{{1}, 2, 100},
+      {{1}, 4, 103}, {{4}, 5, 104}, {{2}, 3, 101}, {{3}, 5, 102}, {{1}, 2, 100},
   };
   GraphSearch gs(std::move(rules), {1}, 5);
 
@@ -71,8 +70,8 @@ TEST(DFS, NotOptimalPath) {
 
 TEST(DFS, ThroughLoop) {
   std::list<Rule> rules = {
-      Rule{{5}, 6, 105}, Rule{{2}, 5, 104}, Rule{{4}, 2, 103},
-      Rule{{3}, 4, 102}, Rule{{2}, 3, 101}, Rule{{1}, 2, 100},
+      {{5}, 6, 105}, {{2}, 5, 104}, {{4}, 2, 103},
+      {{3}, 4, 102}, {{2}, 3, 101}, {{1}, 2, 100},
   };
   GraphSearch gs(std::move(rules), {1}, 6);
 
@@ -84,9 +83,9 @@ TEST(DFS, ThroughLoop) {
 
 TEST(DFS, MultiGraph) {
   std::list<Rule> rules = {
-    Rule{{3, 4}, 5, 101},
-    Rule{{1, 2}, 5, 100},
-    Rule{{5, 6}, 7, 102},
+      {{3, 4}, 5, 101},
+      {{1, 2}, 5, 100},
+      {{5, 6}, 7, 102},
   };
   GraphSearch gs(std::move(rules), {3, 4, 6}, 7);
 
@@ -97,19 +96,11 @@ TEST(DFS, MultiGraph) {
 }
 
 static std::list<Rule> buildComplexGraph() {
-  return std::list<Rule> {
-    Rule{{1, 2}, 3, 100},
-    Rule{{2, 3, 4}, 5, 101},
-    Rule{{6, 7}, 4, 102},
-    Rule{{8, 9}, 3, 103},
-    Rule{{5, 10}, 11, 104},
-    Rule{{4, 12, 13}, 10, 105},
-    Rule{{14, 15}, 13, 106},
-    Rule{{16, 17}, 18, 107},
-    Rule{{19, 20}, 16, 108},
-    Rule{{10, 17}, 11, 109},
-    Rule{{21, 22}, 10, 110},
-    Rule{{23, 24}, 17, 111},
+  return {
+      {{1, 2}, 3, 100},    {{2, 3, 4}, 5, 101}, {{6, 7}, 4, 102},
+      {{8, 9}, 3, 103},    {{5, 10}, 11, 104},  {{4, 12, 13}, 10, 105},
+      {{14, 15}, 13, 106}, {{16, 17}, 18, 107}, {{19, 20}, 16, 108},
+      {{10, 17}, 11, 109}, {{21, 22}, 10, 110}, {{23, 24}, 17, 111},
   };
 }
 

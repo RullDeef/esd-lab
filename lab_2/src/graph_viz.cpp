@@ -38,31 +38,34 @@ GraphViz &GraphViz::DefineGraph(const std::list<Rule> &rules) {
   return *this;
 }
 
-GraphViz &GraphViz::DrawSourceNodes(const std::vector<int>& sourceNodes) {
-  for (const auto&node : sourceNodes) {
-    std::stringstream ss;
-    ss << "    Node" << node
-       << " [style = filled, color = blue, fillcolor = lightblue];\n";
-    m_graphDefinitions.push_back(ss.str());
-  }
+GraphViz &GraphViz::DrawSourceNodes(const std::vector<int> &nodes) {
+  DrawNodes(nodes.begin(), nodes.end(), "blue", "lightblue");
+  return *this;
+}
+
+GraphViz &GraphViz::DrawClosedNodes(const std::list<int> &nodes) {
+  DrawNodes(nodes.begin(), nodes.end(), "green", "lightgreen");
+  return *this;
+}
+
+GraphViz &GraphViz::DrawForbiddenNodes(const std::list<int> &nodes) {
+  DrawNodes(nodes.begin(), nodes.end(), "gray", "lightgray");
+  return *this;
+}
+
+GraphViz &GraphViz::DrawForbiddenRules(const std::list<int> &rules) {
+  DrawRules(rules, "gray", "lightgray");
   return *this;
 }
 
 GraphViz &GraphViz::DrawDestinationNode(int node) {
-  std::stringstream ss;
-  ss << "    Node" << node
-     << " [style = filled, color = red, fillcolor = lightgreen];\n";
-  m_graphDefinitions.push_back(ss.str());
+  const std::list<int> nodes = {node};
+  DrawNodes(nodes.begin(), nodes.end(), "red", NULL);
   return *this;
 }
 
 GraphViz &GraphViz::DrawPath(const std::list<int> &ruleNumbers) {
-  for (const auto &rule : ruleNumbers) {
-    std::stringstream ss;
-    ss << "    Rule" << rule
-       << " [style = filled, color = green, fillcolor = lightgreen];\n";
-    m_graphDefinitions.push_back(ss.str());
-  }
+  DrawRules(ruleNumbers, "green", "lightgreen");
   return *this;
 }
 
@@ -80,4 +83,33 @@ void GraphViz::Export(const char *filename) {
   std::string cmd = "dot -Tsvg " + std::string(tmpFilename) + " -o " + filename;
   if (system(cmd.c_str()) != 0)
     throw std::runtime_error("failed to convert dot graph to svg");
+}
+
+template <typename Iter>
+void GraphViz::DrawNodes(Iter begin, Iter end, const char *color,
+                         const char *fillcolor) {
+  while (begin != end) {
+    std::stringstream ss;
+    ss << "    Node" << *begin++;
+    if (fillcolor)
+      ss << " [style = filled, color = " << color
+         << ", fillcolor = " << fillcolor << "];\n";
+    else
+      ss << " [style = filled, color = " << color << "];\n";
+    m_graphDefinitions.push_back(ss.str());
+  }
+}
+
+void GraphViz::DrawRules(const std::list<int> &rules, const char *color,
+                         const char *fillcolor) {
+  for (const auto &rule : rules) {
+    std::stringstream ss;
+    ss << "    Rule" << rule;
+    if (fillcolor)
+      ss << " [style = filled, color = " << color
+         << ", fillcolor = " << fillcolor << "];\n";
+    else
+      ss << " [style = filled, color = " << color << "];\n";
+    m_graphDefinitions.push_back(ss.str());
+  }
 }
