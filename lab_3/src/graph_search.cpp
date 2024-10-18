@@ -2,8 +2,8 @@
 #include <algorithm>
 #include <iostream>
 
-GraphSearchRev::GraphSearchRev(std::list<Rule> rules, std::vector<int> srcNodes,
-                               int dstNode)
+GraphSearch::GraphSearch(std::list<Rule> rules, std::vector<int> srcNodes,
+                         int dstNode)
     : m_rules(std::move(rules)), m_srcNodes(std::move(srcNodes)) {
   if (m_srcNodes.size() == 0)
     m_noSolution = true;
@@ -21,7 +21,7 @@ GraphSearchRev::GraphSearchRev(std::list<Rule> rules, std::vector<int> srcNodes,
   }
 }
 
-std::list<int> GraphSearchRev::GetForbiddenNodes() const {
+std::list<int> GraphSearch::GetForbiddenNodes() const {
   std::list<int> res;
   for (auto [num, node] : m_nodes)
     if (node.forbidden)
@@ -29,7 +29,7 @@ std::list<int> GraphSearchRev::GetForbiddenNodes() const {
   return res;
 }
 
-std::list<int> GraphSearchRev::GetForbiddenRules() const {
+std::list<int> GraphSearch::GetForbiddenRules() const {
   std::list<int> res;
   for (auto [num, rule] : m_rulesRef)
     if (rule->forbidden)
@@ -37,7 +37,7 @@ std::list<int> GraphSearchRev::GetForbiddenRules() const {
   return res;
 }
 
-std::list<int> GraphSearchRev::DoDepthFirstSearch() {
+std::list<int> GraphSearch::DoDepthFirstSearch() {
   ShowState(true);
   while (!m_foundSolution && !m_noSolution) {
     int node = m_openNodes.back();
@@ -61,7 +61,7 @@ std::list<int> GraphSearchRev::DoDepthFirstSearch() {
   return m_closedRules;
 }
 
-int GraphSearchRev::DescendantsDFS(int node) {
+int GraphSearch::DescendantsDFS(int node) {
   int count = 0;
   for (auto &rule : m_rules) {
     if (rule.visited || rule.dstNode != node || rule.forbidden)
@@ -95,7 +95,7 @@ int GraphSearchRev::DescendantsDFS(int node) {
   return count;
 }
 
-void GraphSearchRev::Backtrack(int node) {
+void GraphSearch::Backtrack(int node) {
   while (true) {
     // node at top of open node stack needs to be forbidden
     m_nodes[node].forbidden = true;
@@ -129,7 +129,7 @@ void GraphSearchRev::Backtrack(int node) {
   }
 }
 
-void GraphSearchRev::Mark(int node) {
+void GraphSearch::Mark(int node) {
   // 0. mark given node as closed
   // 1. pop all rules that have same dst node
   // 2. if current top of opened rules has closed inputs - repeat
@@ -165,7 +165,7 @@ void GraphSearchRev::Mark(int node) {
   }
 }
 
-void GraphSearchRev::ShowState(bool header) {
+void GraphSearch::ShowState(bool header) {
   if (header)
     std::cout << "+------------------+" << std::endl
               << "| open nodes   (ON)|" << std::endl

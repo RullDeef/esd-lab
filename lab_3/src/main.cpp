@@ -1,5 +1,5 @@
 #include "dict.h"
-#include "graph_search_bfs.h"
+#include "graph_search.h"
 #include "graph_viz.h"
 #include "rule_printer.h"
 #include <cstdlib>
@@ -78,10 +78,10 @@ int main(int argc, char **argv) {
   std::cout << ", end node: " << dstNode << std::endl;
 
   GraphSearch gs(database->Rules(), srcNodes, dstNode);
-  auto rulesBFS = gs.DoBreadthFirstSearch();
+  auto rulesDFS = gs.DoDepthFirstSearch();
 
-  std::cout << "BFS: ";
-  for (auto rule : rulesBFS)
+  std::cout << "DFS: ";
+  for (auto rule : rulesDFS)
     std::cout << rule << " -> ";
   std::cout << std::endl << "-----------------------------" << std::endl;
 
@@ -90,10 +90,10 @@ int main(int argc, char **argv) {
         .DefineGraph(database->Rules())
         .DrawClosedNodes(gs.GetClosedNodes())
         .DrawSourceNodes(srcNodes)
-        // .DrawForbiddenNodes(gs.GetForbiddenNodes())
+        .DrawForbiddenNodes(gs.GetForbiddenNodes())
         .DrawDestinationNode(dstNode)
-        .DrawForbiddenRules(gs.GetClosedRules())
-        .DrawPath(rulesBFS)
+        .DrawForbiddenRules(gs.GetForbiddenRules())
+        .DrawPath(gs.GetClosedRules())
         .Export(svgFilename);
   }
 

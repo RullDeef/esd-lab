@@ -1,95 +1,92 @@
-#include "graph_search.h"
+#include "graph_search_bfs.h"
 #include <gtest/gtest.h>
 
-TEST(DFS, SameSourceAndTarget) {
+TEST(BFS, SingleStep) {
   std::list<Rule> rules = {
-      {{1}, 1, 100},
+      {{1, 2}, 3, 100},
   };
-  GraphSearchRev gs(std::move(rules), {1}, 1);
+  GraphSearch gs(std::move(rules), {1, 2}, 3);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
+
+  const std::list<int> expected = {100};
+  ASSERT_EQ(expected, actual);
+}
+
+TEST(BFS, SingleStepNoSolution) {
+  std::list<Rule> rules = {
+      {{1, 2, 3}, 4, 100},
+  };
+  GraphSearch gs(std::move(rules), {1, 2}, 4);
+
+  const auto actual = gs.DoBreadthFirstSearch();
 
   const std::list<int> expected = {};
   ASSERT_EQ(expected, actual);
 }
 
-TEST(DFS, SimpleLinearPath) {
+TEST(BFS, SimplePath) {
   std::list<Rule> rules = {
       {{3}, 4, 102},
       {{1}, 2, 100},
       {{2}, 3, 101},
   };
-  GraphSearchRev gs(std::move(rules), {1}, 4);
+  GraphSearch gs(std::move(rules), {1}, 4);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
   const std::list<int> expected = {100, 101, 102};
   ASSERT_EQ(expected, actual);
 }
 
-TEST(DFS, SimpleNoSolution) {
+TEST(BFS, SimpleNoSolution) {
   std::list<Rule> rules = {
       {{3}, 4, 102},
       {{1}, 2, 100},
       {{2}, 3, 101},
   };
-  GraphSearchRev gs(std::move(rules), {4}, 1);
+  GraphSearch gs(std::move(rules), {4}, 1);
 
-  const auto actual = gs.DoDepthFirstSearch();
-
-  const std::list<int> expected = {};
-  ASSERT_EQ(expected, actual);
-}
-
-TEST(DFS, SimpleLoopNoSolution) {
-  std::list<Rule> rules = {
-      {{1}, 2, 100},
-      {{2}, 3, 101},
-      {{3}, 1, 102},
-      {{4}, 2, 103},
-  };
-  GraphSearchRev gs(std::move(rules), {1}, 4);
-
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
   const std::list<int> expected = {};
   ASSERT_EQ(expected, actual);
 }
 
-TEST(DFS, NotOptimalPath) {
+TEST(BFS, OptimalPath) {
   std::list<Rule> rules = {
       {{1}, 4, 103}, {{4}, 5, 104}, {{2}, 3, 101}, {{3}, 5, 102}, {{1}, 2, 100},
   };
-  GraphSearchRev gs(std::move(rules), {1}, 5);
+  GraphSearch gs(std::move(rules), {1}, 5);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
-  const std::list<int> expected = {100, 101, 102};
+  const std::list<int> expected = {103, 104};
   ASSERT_EQ(expected, actual);
 }
 
-TEST(DFS, ThroughLoop) {
+TEST(BFS, ThroughLoop) {
   std::list<Rule> rules = {
       {{5}, 6, 105}, {{2}, 5, 104}, {{4}, 2, 103},
       {{3}, 4, 102}, {{2}, 3, 101}, {{1}, 2, 100},
   };
-  GraphSearchRev gs(std::move(rules), {1}, 6);
+  GraphSearch gs(std::move(rules), {1}, 6);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
   const std::list<int> expected = {100, 104, 105};
   ASSERT_EQ(expected, actual);
 }
 
-TEST(DFS, MultiGraph) {
+TEST(BFS, MultiGraph) {
   std::list<Rule> rules = {
       {{3, 4}, 5, 101},
       {{1, 2}, 5, 100},
       {{5, 6}, 7, 102},
   };
-  GraphSearchRev gs(std::move(rules), {3, 4, 6}, 7);
+  GraphSearch gs(std::move(rules), {3, 4, 6}, 7);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
   const std::list<int> expected = {101, 102};
   ASSERT_EQ(expected, actual);
@@ -104,11 +101,11 @@ static std::list<Rule> buildComplexGraph() {
   };
 }
 
-TEST(DFS, ComplexGraph) {
+TEST(BFS, ComplexGraph) {
   auto rules = buildComplexGraph();
-  GraphSearchRev gs(std::move(rules), {2, 8, 9, 4}, 5);
+  GraphSearch gs(std::move(rules), {2, 8, 9, 4}, 5);
 
-  const auto actual = gs.DoDepthFirstSearch();
+  const auto actual = gs.DoBreadthFirstSearch();
 
   std::list<int> expected = {103, 101};
   ASSERT_EQ(expected, actual);

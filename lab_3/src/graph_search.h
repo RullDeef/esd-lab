@@ -5,9 +5,9 @@
 #include <list>
 #include <map>
 
-class GraphSearchRev {
+class GraphSearch {
 public:
-  GraphSearchRev(std::list<Rule> rules, std::vector<int> srcNode, int dstNode);
+  GraphSearch(std::list<Rule> rules, std::vector<int> srcNode, int dstNode);
 
   /* запуск поиска в графе в глубину от цели */
   std::list<int> DoDepthFirstSearch();

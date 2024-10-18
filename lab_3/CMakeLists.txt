@@ -19,7 +19,6 @@ enable_testing()
 add_library(core
     src/dict.cpp
     src/graph_search.cpp
-    src/graph_search_bfs.cpp
     src/graph_viz.cpp
     src/rule_printer.cpp
 )
@@ -31,7 +30,6 @@ target_link_libraries(app core)
 add_executable(
     unittests
     tests/dfs.cpp
-    tests/bfs.cpp
 )
 target_link_libraries(unittests core GTest::gtest_main)
 
