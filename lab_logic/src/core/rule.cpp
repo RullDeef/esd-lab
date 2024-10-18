@@ -1,6 +1,7 @@
 #include "rule.h"
 #include <algorithm>
 #include <iterator>
+#include <list>
 #include <memory>
 #include <utility>
 
@@ -91,7 +92,13 @@ std::string Rule::toString() const {
   return res;
 }
 
+std::list<Rule::ptr> Rule::getDisjunctionsList() const {
+  return std::list<ptr>(operands.begin(), operands.end());
+}
+
 Rule::ptr Rule::toNormalForm() {
+  if (isCNF)
+    return shared_from_this();
   switch (type) {
   case Type::atom:
     return std::make_shared<Rule>(

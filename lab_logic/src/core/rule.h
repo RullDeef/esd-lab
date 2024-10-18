@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,6 +23,12 @@ public:
   static ptr createAtom(std::string value);
   static ptr createInverse(ptr rule);
   static ptr createConjunction(ptr left, ptr right);
+  template <typename Iter> static ptr createConjunction(Iter begin, Iter end) {
+    auto first = *begin++;
+    return begin == end
+               ? first
+               : createConjunction(first, createConjunction(begin, end));
+  }
   static ptr createDisjunction(ptr left, ptr right);
   static ptr createImplication(ptr from, ptr to);
   static ptr createEquality(ptr left, ptr right);
@@ -36,6 +43,11 @@ public:
 
   ptr toNormalForm();
 
+  // appliable only to rules in conjunctive normal form
+  std::list<ptr> getDisjunctionsList() const;
+
+  std::vector<ptr> getOperands() const { return operands; }
+
 private:
   ptr inverseToNormalForm();
   ptr conjunctionToNormalForm();
@@ -44,6 +56,7 @@ private:
   Type type;
   std::string value;
   std::vector<ptr> operands;
+  bool isCNF = false;
 };
 
 inline bool operator==(const std::string &str, const Rule &rule) {
