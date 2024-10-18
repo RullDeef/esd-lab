@@ -22,22 +22,6 @@ GraphSearch::GraphSearch(std::list<Rule> rules, std::vector<int> srcNodes,
   }
 }
 
-std::list<int> GraphSearch::GetForbiddenNodes() const {
-  std::list<int> res;
-  for (auto [num, node] : m_nodes)
-    if (node.forbidden)
-      res.push_back(num);
-  return res;
-}
-
-std::list<int> GraphSearch::GetForbiddenRules() const {
-  std::list<int> res;
-  for (const auto &rule : m_rules)
-    if (rule.forbidden)
-      res.push_back(rule.number);
-  return res;
-}
-
 std::list<int> GraphSearch::DoBreadthFirstSearch() {
   ShowState(true);
   while (!m_foundSolution && !m_noSolution) {

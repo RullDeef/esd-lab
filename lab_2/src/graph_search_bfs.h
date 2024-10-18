@@ -14,8 +14,6 @@ public:
 
   const std::list<int> &GetClosedNodes() const { return m_closedNodes; }
   const std::list<int> &GetClosedRules() const { return m_closedRules; }
-  std::list<int> GetForbiddenNodes() const;
-  std::list<int> GetForbiddenRules() const;
 
 private:
   /* добавление потомков в очередь открытых вершин */
@@ -32,8 +30,6 @@ private:
   int m_dstNode;
   std::map<int, Node> m_nodes;
   std::map<int, Rule *> m_rulesRef;
-  // std::list<int> m_openNodes;
-  // std::list<int> m_openRules;
   std::list<int> m_closedNodes;
   std::list<int> m_closedRules;
   bool m_foundSolution = false;
