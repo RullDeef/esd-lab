@@ -69,7 +69,7 @@ TEST_F(RuleTests, cnfMedium) {
 
   auto cnf = rule->toNormalForm();
 
-  auto expected = "(~A + A) & (B + A)"s;
+  auto expected = "B + A"s;
   auto actual = cnf->toString();
 
   EXPECT_EQ(expected, actual);
@@ -90,7 +90,7 @@ TEST_F(RuleTests, cnfHard) {
 
   auto cnf = rule->toNormalForm();
 
-  auto expected = "(A + ~A + B) & (~B + ~A + B)"s;
+  auto expected = "1"s;
   auto actual = cnf->toString();
 
   EXPECT_EQ(expected, actual);
@@ -109,7 +109,19 @@ TEST_F(RuleTests, cnfVeryHard) {
   auto cnf = rule->toNormalForm();
 
   auto expected =
-      "(A + B + ~A) & (~B + B + ~A) & (~B + ~A + B) & (A + ~A + B)"s;
+      "1"s; // "(A + B + ~A) & (~B + B + ~A) & (~B + ~A + B) & (A + ~A + B)"s;
+  auto actual = cnf->toString();
+
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(RuleTests, identityReduction) {
+  // ~(A <-> B)
+  auto rule = Rule::createInverse(
+      Rule::createEquality(Rule::createAtom("A"), Rule::createAtom("B")));
+
+  auto cnf = rule->toNormalForm();
+  auto expected = "(A + B) & (~B + ~A)";
   auto actual = cnf->toString();
 
   EXPECT_EQ(expected, actual);

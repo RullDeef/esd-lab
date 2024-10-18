@@ -21,22 +21,9 @@ static Rule::ptr tryResolve(Rule::ptr disjunction1, Rule::ptr disjunction2) {
   auto disAtoms1 = disjunction1->getOperands();
   auto disAtoms2 = disjunction2->getOperands();
 
-  // std::cout << "try resolve for " << disjunction1->toString() << " and "
-  //           << disjunction2->toString() << std::endl;
-  //
-  // std::cout << "disAtoms1: ";
-  // for (const auto &rule : disAtoms1)
-  //   std::cout << rule->toString() << ", ";
-  // std::cout << "\ndisAtoms2: ";
-  // for (const auto &rule : disAtoms2)
-  //   std::cout << rule->toString() << ", ";
-  // std::cout << std::endl;
-
   for (int i = 0; i < disAtoms1.size(); ++i) {
     for (int j = 0; j < disAtoms2.size(); ++j) {
       if (isInversePair(disAtoms1[i], disAtoms2[j])) {
-        // std::cout << "inverse pair found at i = " << i << ", j = " << j
-        //           << std::endl;
         disAtoms1.erase(disAtoms1.begin() + i);
         disAtoms2.erase(disAtoms2.begin() + j);
 
@@ -70,7 +57,7 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   PrintState();
 
   // реализуем стратегию с опорным множеством
-  while (!m_referenceSet.empty()) {
+  while (!m_referenceSet.empty() && !m_axiomSet.empty()) {
     // берем один дизъюнкт из опорного множества и ищем ему пару среди
     // дизъюнктов опорного множества и, если не нашли - ищем в аксиомах.
     auto ref = m_referenceSet.front();
@@ -111,7 +98,7 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
 
   // обошли все возможные дизъюнкты в опорном множестве и не получили пустой
   // дизъюнкт - исходное утверждение не доказано
-  return false;
+  return m_axiomSet.empty();
 }
 
 void Resolver::PrintState() {

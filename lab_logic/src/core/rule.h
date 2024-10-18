@@ -3,11 +3,13 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 class Rule : public std::enable_shared_from_this<Rule> {
 public:
   enum class Type {
+    constant,
     atom,
     inverse,
     disjunction,
@@ -19,7 +21,11 @@ public:
   // atom constructor
   Rule(std::string value);
   Rule(Type type, std::vector<ptr> operands);
+  Rule(std::true_type);
+  Rule(std::false_type);
 
+  static ptr createTrue();
+  static ptr createFalse();
   static ptr createAtom(std::string value);
   static ptr createInverse(ptr rule);
   static ptr createConjunction(ptr left, ptr right);
@@ -47,6 +53,8 @@ public:
   std::list<ptr> getDisjunctionsList() const;
 
   std::vector<ptr> getOperands() const { return operands; }
+
+  friend bool contraryPair(const Rule &left, const Rule &right);
 
 private:
   ptr inverseToNormalForm();
