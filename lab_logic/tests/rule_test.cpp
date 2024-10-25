@@ -1,11 +1,10 @@
 #include "rule.h"
+#include "rule_parser.h"
 #include <gtest/gtest.h>
 
 using namespace std::string_literals;
 
-class RuleTests : public ::testing::Test {};
-
-TEST_F(RuleTests, printer) {
+TEST(RuleTests, printer) {
   auto rule = Rule::createDisjunction(
       Rule::createConjunction(Rule::createAtom("A"),
                               Rule::createInverse(Rule::createAtom("B"))),
@@ -18,7 +17,7 @@ TEST_F(RuleTests, printer) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfSimple) {
+TEST(RuleTests, cnfSimple) {
   auto rule = Rule::createInverse(Rule::createInverse(Rule::createAtom("A")));
 
   auto cnf = rule->toNormalForm();
@@ -30,7 +29,7 @@ TEST_F(RuleTests, cnfSimple) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfConjunctions) {
+TEST(RuleTests, cnfConjunctions) {
   // (A & D) & (B & C)
   auto rule = Rule::createConjunction(
       Rule::createConjunction(Rule::createAtom("A"), Rule::createAtom("D")),
@@ -44,7 +43,7 @@ TEST_F(RuleTests, cnfConjunctions) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfDisjunctions) {
+TEST(RuleTests, cnfDisjunctions) {
   // (A + D) + (B + C)
   auto rule = Rule::createDisjunction(
       Rule::createDisjunction(Rule::createAtom("A"), Rule::createAtom("D")),
@@ -58,7 +57,7 @@ TEST_F(RuleTests, cnfDisjunctions) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfMedium) {
+TEST(RuleTests, cnfMedium) {
   // (~A & B) + A
   auto ruleA = Rule::createAtom("A");
   auto ruleB = Rule::createAtom("B");
@@ -75,7 +74,7 @@ TEST_F(RuleTests, cnfMedium) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfHard) {
+TEST(RuleTests, cnfHard) {
   // ((A -> B) & A) -> B
   // ~((~A + B) & A) + B
   // (A & ~B) + ~A + B
@@ -96,7 +95,7 @@ TEST_F(RuleTests, cnfHard) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, cnfVeryHard) {
+TEST(RuleTests, cnfVeryHard) {
   // contraposition rule:
   // (A -> B) <-> (~B -> ~A)
   auto ruleA = Rule::createAtom("A");
@@ -115,7 +114,7 @@ TEST_F(RuleTests, cnfVeryHard) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(RuleTests, identityReduction) {
+TEST(RuleTests, identityReduction) {
   // ~(A <-> B)
   auto rule = Rule::createInverse(
       Rule::createEquality(Rule::createAtom("A"), Rule::createAtom("B")));
@@ -123,6 +122,34 @@ TEST_F(RuleTests, identityReduction) {
   auto cnf = rule->toNormalForm();
   auto expected = "(A + B) & (~B + ~A)";
   auto actual = cnf->toString();
+
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(RuleTests, predicateNormalization) {
+  auto text = "P(X) + Q(Y) & R(Z, g(X))";
+  Rule::ptr rule;
+
+  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+
+  rule = rule->toNormalForm();
+
+  auto expected = "(P(X) + Q(Y)) & (P(X) + R(Z, g(X)))";
+  auto actual = rule->toString();
+
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(RuleTests, differentPredicates) {
+  auto text = "P(X) + P(Y)";
+  Rule::ptr rule;
+
+  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+
+  rule = rule->toNormalForm();
+
+  auto expected = "P(X) + P(Y)";
+  auto actual = rule->toString();
 
   EXPECT_EQ(expected, actual);
 }

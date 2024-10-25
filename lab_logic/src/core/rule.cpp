@@ -89,8 +89,14 @@ Rule::ptr Rule::createForAll(std::set<std::string> vars, Rule::ptr rule) {
 bool Rule::operator==(const Rule &other) const {
   if (this == &other)
     return true;
-  if (type == Type::atom || other.type == Type::atom)
-    return type == other.type && value == other.value;
+  if (type == Type::atom || other.type == Type::atom) {
+    if (type != other.type || value != other.value)
+      return false;
+    bool sameArgs = operands.size() == other.operands.size();
+    for (int i = 0; sameArgs && i < operands.size(); ++i)
+      sameArgs = sameArgs && operands[i] == other.operands[i];
+    return sameArgs;
+  }
   if (type != Type::inverse && operands.size() == 1)
     return *operands[0] == other;
   if (other.type != Type::inverse && other.operands.size() == 1)
