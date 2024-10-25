@@ -45,6 +45,11 @@ bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
 }
 
 bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
+  if (target->toString() == "1")
+    return true;
+  if (target->toString() == "0")
+    return false;
+
   // выделить список элементарных дизъюнктов
   m_axiomSet = source->toNormalForm()->getDisjunctionsList();
   m_referenceSet =

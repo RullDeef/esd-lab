@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 
 /*
@@ -16,7 +17,10 @@ Rule Grammar in EBNF:
 <term-rule> ::= '(' <equ-rule> ')' | <neg> | <atom>
 <neg>       ::= '~' <term-rule>
 <equ-sign>  ::= '==' | '=' | '<=>' | '<->'
-<atom>      ::= string
+<neg>       ::= '~' <term-rule>
+<equ-sign>  ::= '==' | '=' | '<=>' | '<->'
+<atom>      ::= string [ '(' <atom-list> ')' | <atom-list> ]
+<atom-list> ::= <atom> [ ',' <atom-list> ]
 
 */
 
@@ -55,11 +59,26 @@ Rule::ptr RuleParser::ParseImplRule() {
 }
 
 Rule::ptr RuleParser::ParseConjRule() {
-  auto left = ParseTermRule();
+  auto left = ParseQuantRule();
   if (!Eat("&"))
     return left;
   auto right = ParseConjRule();
   return Rule::createConjunction(left, right);
+}
+
+Rule::ptr RuleParser::ParseQuantRule() {
+  if (!SkipWhitespace())
+    RaiseError("quantifier non-term expected");
+  if (Eat("\\exists")) {
+    auto vars = ParseVarList();
+    auto rule = ParseQuantRule();
+    return Rule::createExists(std::move(vars), std::move(rule));
+  } else if (Eat("\\forall")) {
+    auto vars = ParseVarList();
+    auto rule = ParseQuantRule();
+    return Rule::createForAll(std::move(vars), std::move(rule));
+  }
+  return ParseTermRule();
 }
 
 Rule::ptr RuleParser::ParseTermRule() {
@@ -74,15 +93,48 @@ Rule::ptr RuleParser::ParseTermRule() {
 }
 
 Rule::ptr RuleParser::ParseAtom() {
-  size_t size = 0;
-  if (!SkipWhitespace())
+  auto name = ParseIdent();
+  if (!name)
     RaiseError("atom expected");
+  SkipWhitespace();
+  std::vector<Rule::ptr> operands;
+  // parse predicate arguments
+  if (Eat("(")) {
+    do {
+      auto operand = ParseAtom();
+      operands.push_back(std::move(operand));
+    } while (Eat(","));
+    if (!Eat(")"))
+      RaiseError("')' expected");
+  }
+  return Rule::createPredicate(std::move(*name), std::move(operands));
+}
+
+std::set<std::string> RuleParser::ParseVarList() {
+  if (!Eat("("))
+    RaiseError("'(' expected");
+  std::set<std::string> vars;
+  do {
+    auto ident = ParseIdent();
+    if (!ident)
+      RaiseError("var name expected");
+    vars.insert(*ident);
+  } while (Eat(","));
+  if (!Eat(")"))
+    RaiseError("')' expected");
+  return vars;
+}
+
+std::optional<std::string> RuleParser::ParseIdent() {
+  SkipWhitespace();
+  size_t size = 0;
   while (m_Source[m_pos + size] && std::isalnum(m_Source[m_pos + size]))
     size++;
-  auto rule =
-      Rule::createAtom(std::string(m_Source + m_pos, m_Source + m_pos + size));
+  if (size == 0)
+    return std::nullopt;
+  auto name = std::string(m_Source + m_pos, m_Source + m_pos + size);
   m_pos += size;
-  return rule;
+  return std::move(name);
 }
 
 bool RuleParser::Peek(const char *expect) {

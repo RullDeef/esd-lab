@@ -2,6 +2,7 @@
 
 #include <list>
 #include <memory>
+#include <set>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -10,34 +11,44 @@ class Rule : public std::enable_shared_from_this<Rule> {
 public:
   enum class Type {
     constant,
-    atom,
+    atom, // predicate actually
     inverse,
     disjunction,
     conjunction,
+    forall, // value used for variable name
+    exists, // value used for variable name
   };
 
   using ptr = std::shared_ptr<Rule>;
 
-  // atom constructor
-  Rule(std::string value);
-  Rule(Type type, std::vector<ptr> operands);
+  // general constructor for operators
+  Rule(Type type, std::vector<ptr> operands, std::set<std::string> vars = {});
+
+  // constants
   Rule(std::true_type);
   Rule(std::false_type);
+
+  // atom/predicate constructor
+  Rule(std::string name, std::vector<ptr> operands = {});
 
   static ptr createTrue();
   static ptr createFalse();
   static ptr createAtom(std::string value);
+  static ptr createPredicate(std::string name, std::vector<ptr> operands);
   static ptr createInverse(ptr rule);
   static ptr createConjunction(ptr left, ptr right);
   template <typename Iter> static ptr createConjunction(Iter begin, Iter end) {
     auto first = *begin++;
-    return begin == end
-               ? first
-               : createConjunction(first, createConjunction(begin, end));
+    return begin == end ? std::move(first)
+                        : createConjunction(std::move(first),
+                                            createConjunction(begin, end));
   }
   static ptr createDisjunction(ptr left, ptr right);
   static ptr createImplication(ptr from, ptr to);
   static ptr createEquality(ptr left, ptr right);
+
+  static ptr createExists(std::set<std::string> vars, Rule::ptr rule);
+  static ptr createForAll(std::set<std::string> vars, Rule::ptr rule);
 
   bool operator==(const Rule &other) const;
   bool operator!=(const Rule &other) const;
@@ -54,6 +65,9 @@ public:
 
   std::vector<ptr> getOperands() const { return operands; }
 
+  // checks weither this rule contains free vars
+  std::set<std::string> getFreeVars() const;
+
   friend bool contraryPair(const Rule &left, const Rule &right);
 
 private:
@@ -63,6 +77,10 @@ private:
 
   Type type;
   std::string value;
+  // linked variables for quantifiers only
+  std::set<std::string> vars;
+  // for predicate this array holds references to variables and values which are
+  // arguments for this predicate. For actual atom it is empty
   std::vector<ptr> operands;
   bool isCNF = false;
 };

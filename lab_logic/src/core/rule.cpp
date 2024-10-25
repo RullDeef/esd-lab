@@ -29,10 +29,11 @@ Rule::ptr disjunctReduction(Rule::ptr rule) {
   return std::make_shared<Rule>(Rule::Type::disjunction, terms);
 }
 
-Rule::Rule(std::string value) : type(Type::atom), value(value) {}
+Rule::Rule(std::string name, std::vector<ptr> operands)
+    : type(Type::atom), value(std::move(name)), operands(std::move(operands)) {}
 
-Rule::Rule(Type type, std::vector<ptr> operands)
-    : type(type), operands(std::move(operands)) {}
+Rule::Rule(Type type, std::vector<ptr> operands, std::set<std::string> vars)
+    : type(type), vars(std::move(vars)), operands(std::move(operands)) {}
 
 Rule::Rule(std::true_type) : type(Type::constant), value("1") {}
 
@@ -47,7 +48,11 @@ Rule::ptr Rule::createFalse() {
 }
 
 Rule::ptr Rule::createAtom(std::string value) {
-  return std::make_shared<Rule>(value);
+  return std::make_shared<Rule>(std::move(value));
+}
+
+Rule::ptr Rule::createPredicate(std::string name, std::vector<ptr> operands) {
+  return std::make_shared<Rule>(std::move(name), std::move(operands));
 }
 
 Rule::ptr Rule::createInverse(Rule::ptr rule) {
@@ -69,6 +74,16 @@ Rule::ptr Rule::createImplication(Rule::ptr from, Rule::ptr to) {
 Rule::ptr Rule::createEquality(ptr left, ptr right) {
   return createConjunction(createImplication(left, right),
                            createImplication(right, left));
+}
+
+Rule::ptr Rule::createExists(std::set<std::string> vars, Rule::ptr rule) {
+  return std::make_shared<Rule>(Type::exists, std::vector{rule},
+                                std::move(vars));
+}
+
+Rule::ptr Rule::createForAll(std::set<std::string> vars, Rule::ptr rule) {
+  return std::make_shared<Rule>(Type::forall, std::vector{rule},
+                                std::move(vars));
 }
 
 bool Rule::operator==(const Rule &other) const {
@@ -98,10 +113,23 @@ bool Rule::operator!=(const std::string &val) const { return !(*this == val); }
 
 std::string Rule::toString() const {
   std::string res = "";
+  bool first = true;
   switch (type) {
   case Type::constant:
   case Type::atom:
-    res = value;
+    if (operands.empty())
+      res = value;
+    else {
+      res = value + "(";
+      bool first = true;
+      for (auto operand : operands) {
+        if (!first)
+          res += ", ";
+        res += operand->toString();
+        first = false;
+      }
+      res += ")";
+    }
     break;
   case Type::inverse:
     if (operands[0]->type == Type::atom || operands[0]->operands.size() == 1)
@@ -112,7 +140,8 @@ std::string Rule::toString() const {
   case Type::conjunction:
     for (int i = 0; i < operands.size(); ++i) {
       std::string opVal = operands[i]->toString();
-      if (operands[i]->operands.size() > 1 && operands.size() > 1)
+      if (operands[i]->type != Type::atom && operands[i]->operands.size() > 1 &&
+          operands.size() > 1)
         opVal = "(" + opVal + ")";
       res += (i > 0 ? " & " : "") + opVal;
     }
@@ -120,10 +149,31 @@ std::string Rule::toString() const {
   case Type::disjunction:
     for (int i = 0; i < operands.size(); ++i) {
       auto opVal = operands[i]->toString();
-      if (operands[i]->operands.size() > 1 && operands.size() > 1)
+      if (operands[i]->type != Type::atom && operands[i]->operands.size() > 1 &&
+          operands.size() > 1)
         opVal = "(" + opVal + ")";
       res += (i > 0 ? " + " : "") + opVal;
     }
+    break;
+  case Type::exists:
+    res = "\\exists(";
+    for (auto var : vars) {
+      if (!first)
+        res += ", ";
+      res += var;
+      first = false;
+    }
+    res += ") (" + operands[0]->toString() + ")";
+    break;
+  case Type::forall:
+    res = "\\forall(";
+    for (auto var : vars) {
+      if (!first)
+        res += ", ";
+      res += var;
+      first = false;
+    }
+    res += ") (" + operands[0]->toString() + ")";
     break;
   }
   return res;
@@ -131,6 +181,33 @@ std::string Rule::toString() const {
 
 std::list<Rule::ptr> Rule::getDisjunctionsList() const {
   return std::list<ptr>(operands.begin(), operands.end());
+}
+
+std::set<std::string> Rule::getFreeVars() const {
+  std::set<std::string> res;
+  if (type == Type::constant) {
+    // res = {};
+  } else if (type == Type::atom && !operands.empty()) {
+    // recursion base case
+    for (auto operand : operands) {
+      if (operand->operands.empty())
+        res.insert(operand->value);
+      else {
+        auto inner = operand->getFreeVars();
+        res.insert(inner.begin(), inner.end());
+      }
+    }
+  } else if (type == Type::exists || type == Type::forall) {
+    auto inner = operands[0]->getFreeVars();
+    std::set_difference(inner.begin(), inner.end(), vars.begin(), vars.end(),
+                        std::inserter(res, res.end()));
+  } else {
+    for (auto operand : operands) {
+      auto inner = operand->getFreeVars();
+      res.insert(inner.begin(), inner.end());
+    }
+  }
+  return res;
 }
 
 Rule::ptr Rule::toNormalForm() {
