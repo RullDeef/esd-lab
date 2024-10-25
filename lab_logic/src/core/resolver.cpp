@@ -38,9 +38,9 @@ static Rule::ptr tryResolve(Rule::ptr disjunction1, Rule::ptr disjunction2) {
 }
 
 bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
-  if (source.size() == 0)
-    return false;
-  auto sourceAnd = Rule::createConjunction(source.begin(), source.end());
+  Rule::ptr sourceAnd;
+  if (source.size() > 0)
+    sourceAnd = Rule::createConjunction(source.begin(), source.end());
   return Implies(sourceAnd, target);
 }
 
@@ -51,7 +51,8 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
     return false;
 
   // выделить список элементарных дизъюнктов
-  m_axiomSet = source->toNormalForm()->getDisjunctionsList();
+  m_axiomSet = source ? source->toNormalForm()->getDisjunctionsList()
+                      : std::list<Rule::ptr>{};
   m_referenceSet =
       Rule::createInverse(target)->toNormalForm()->getDisjunctionsList();
 
@@ -62,7 +63,7 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   PrintState();
 
   // реализуем стратегию с опорным множеством
-  while (!m_referenceSet.empty() && !m_axiomSet.empty()) {
+  while (!m_referenceSet.empty()) { // && !m_axiomSet.empty()) {
     // берем один дизъюнкт из опорного множества и ищем ему пару среди
     // дизъюнктов опорного множества и, если не нашли - ищем в аксиомах.
     auto ref = m_referenceSet.front();
@@ -71,8 +72,12 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
     std::list<Rule::ptr>::iterator pair = m_referenceSet.begin();
     while (pair != m_referenceSet.end()) {
       if (auto res = tryResolve(ref, *pair)) {
-        if (res->getOperands().size() == 0)
+        if (res->getOperands().size() == 0) {
+          std::cout << "found empty disjunction with refset: "
+                    << ref->toString() << " and " << (*pair)->toString()
+                    << std::endl;
           return true;
+        }
         m_referenceSet.erase(pair);
         m_referenceSet.push_front(res);
         std::cout << "resolved with refset\n";
@@ -86,8 +91,12 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
       pair = m_axiomSet.begin();
       while (pair != m_axiomSet.end()) {
         if (auto res = tryResolve(ref, *pair)) {
-          if (res->getOperands().size() == 0)
+          if (res->getOperands().size() == 0) {
+            std::cout << "found empty disjunction with axiom: "
+                      << ref->toString() << " and " << (*pair)->toString()
+                      << std::endl;
             return true;
+          }
           m_axiomSet.erase(pair);
           m_referenceSet.push_front(res);
           std::cout << "resolved with axioms\n";
@@ -103,7 +112,7 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
 
   // обошли все возможные дизъюнкты в опорном множестве и не получили пустой
   // дизъюнкт - исходное утверждение не доказано
-  return m_axiomSet.empty();
+  return false;
 }
 
 void Resolver::PrintState() {

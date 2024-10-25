@@ -74,6 +74,20 @@ TEST(RuleTests, cnfMedium) {
   EXPECT_EQ(expected, actual);
 }
 
+TEST(RuleTests, cnfEquality) {
+  auto rule =
+      Rule::createEquality(Rule::createAtom("A"), Rule::createAtom("B"));
+
+  EXPECT_EQ("(~A + B) & (~B + A)", rule->toString());
+
+  auto cnf = rule->toNormalForm();
+
+  auto expected = "(~A + B) & (~B + A)";
+  auto actual = cnf->toString();
+
+  EXPECT_EQ(expected, actual);
+}
+
 TEST(RuleTests, cnfHard) {
   // ((A -> B) & A) -> B
   // ~((~A + B) & A) + B
