@@ -1,6 +1,5 @@
 #include "rule.h"
 #include <algorithm>
-#include <iostream>
 #include <iterator>
 #include <list>
 #include <map>

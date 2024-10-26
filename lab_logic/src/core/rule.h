@@ -64,6 +64,8 @@ public:
   // appliable only to rules in conjunctive normal form
   std::list<ptr> getDisjunctionsList() const;
 
+  Type getType() const { return type; }
+  std::string getValue() const { return value; }
   std::vector<ptr> getOperands() const { return operands; }
 
   // checks weither this rule contains free vars
@@ -94,6 +96,8 @@ private:
   // arguments for this predicate. For actual atom it is empty
   std::vector<ptr> operands;
   bool isCNF = false;
+
+  friend class Substitution;
 };
 
 inline bool operator==(const std::string &str, const Rule &rule) {
