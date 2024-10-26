@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iterator>
 #include <list>
+#include <map>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -216,6 +217,34 @@ std::set<std::string> Rule::getFreeVars() const {
   return res;
 }
 
+void Rule::renameVariable(const std::string &oldName,
+                          const std::string &newName) {
+  switch (type) {
+  case Type::constant:
+    break;
+  case Type::atom:
+    for (auto &op : operands) {
+      if (op->operands.empty() && op->value == oldName)
+        op->value = newName;
+      else
+        op->renameVariable(oldName, newName);
+    }
+    break;
+  case Type::inverse:
+  case Type::conjunction:
+  case Type::disjunction:
+    for (auto &op : operands)
+      op->renameVariable(oldName, newName);
+    break;
+  case Type::exists:
+  case Type::forall:
+    if (vars.count(oldName) == 0)
+      for (auto &op : operands)
+        op->renameVariable(oldName, newName);
+    break;
+  }
+}
+
 Rule::ptr Rule::toNormalForm() {
   if (isCNF)
     return shared_from_this();
@@ -233,6 +262,9 @@ Rule::ptr Rule::toNormalForm() {
     return conjunctionToNormalForm();
   case Type::disjunction:
     return disjunctionToNormalForm();
+  case Type::exists:
+  case Type::forall:
+    return quantifierToNormalForm();
   }
 }
 
@@ -258,16 +290,32 @@ Rule::ptr Rule::inverseToNormalForm() {
     return createDisjunction(createInverse(operands[0]->operands[0]),
                              createInverse(operands[0]->operands[1]))
         ->toNormalForm();
+  case Type::exists:
+    return createForAll(
+        operands[0]->vars,
+        createInverse(operands[0]->operands[0])->toNormalForm());
+  case Type::forall:
+    return createExists(
+        operands[0]->vars,
+        createInverse(operands[0]->operands[0])->toNormalForm());
   }
 }
 
 Rule::ptr Rule::conjunctionToNormalForm() {
   auto left = operands[0]->toNormalForm();
   auto right = operands[1]->toNormalForm();
+
+  // constant propagation
   if (left->type == Type::constant)
     return left->value == "0" ? left : right;
   if (right->type == Type::constant)
     return right->value == "0" ? right : left;
+
+  // extract all quantifiers from both operands (with optional renaming)
+  std::map<std::string, std::string> renamings;
+  std::vector<std::pair<Type, std::set<std::string>>> quantifiers;
+  left = extractFrontQuantifiers(renamings, quantifiers, left);
+  right = extractFrontQuantifiers(renamings, quantifiers, right);
 
   // drag all elementary disjunctions from both paths
   auto disjunctions = left->operands;
@@ -276,16 +324,34 @@ Rule::ptr Rule::conjunctionToNormalForm() {
                  return std::all_of(disjunctions.begin(), disjunctions.end(),
                                     [&x](auto d) { return *x != *d; });
                });
-  return std::make_shared<Rule>(Type::conjunction, disjunctions);
+  ptr res = std::make_shared<Rule>(Type::conjunction, disjunctions);
+
+  // apply quantifiers if any
+  for (int i = quantifiers.size() - 1; i >= 0; --i) {
+    if (quantifiers[i].first == Type::exists)
+      res = createExists(quantifiers[i].second, res);
+    else
+      res = createForAll(quantifiers[i].second, res);
+  }
+
+  return res;
 }
 
 Rule::ptr Rule::disjunctionToNormalForm() {
   auto left = operands[0]->toNormalForm();
   auto right = operands[1]->toNormalForm();
+
+  // constants propagation
   if (left->type == Type::constant)
     return left->value == "1" ? left : right;
   if (right->type == Type::constant)
     return right->value == "1" ? left : right;
+
+  // extract all quantifiers
+  std::map<std::string, std::string> renamings;
+  std::vector<std::pair<Type, std::set<std::string>>> quantifiers;
+  left = extractFrontQuantifiers(renamings, quantifiers, left);
+  right = extractFrontQuantifiers(renamings, quantifiers, right);
 
   auto left_dsj = left->operands;
   auto right_dsj = right->operands;
@@ -314,5 +380,63 @@ Rule::ptr Rule::disjunctionToNormalForm() {
   }
   if (disjunctions.empty())
     return createTrue();
-  return std::make_shared<Rule>(Type::conjunction, disjunctions);
+
+  auto res = std::make_shared<Rule>(Type::conjunction, disjunctions);
+
+  // apply quantifiers if any
+  for (int i = quantifiers.size() - 1; i >= 0; --i) {
+    if (quantifiers[i].first == Type::exists)
+      res = createExists(quantifiers[i].second, res);
+    else
+      res = createForAll(quantifiers[i].second, res);
+  }
+
+  return res;
+}
+
+Rule::ptr Rule::quantifierToNormalForm() {
+  auto rule = operands[0]->toNormalForm();
+  auto ruleVars = rule->getFreeVars();
+  std::set<std::string> newVars;
+  for (const auto &var : vars)
+    if (ruleVars.count(var) > 0)
+      newVars.insert(var);
+  if (newVars.empty())
+    return rule;
+  return std::make_shared<Rule>(type, std::vector{rule}, newVars);
+}
+
+Rule::ptr Rule::extractFrontQuantifiers(
+    std::map<std::string, std::string> &renamings,
+    std::vector<std::pair<Type, std::set<std::string>>> &quantifiers,
+    ptr rule) {
+  if (renamings.empty()) {
+    while (rule->type == Type::forall || rule->type == Type::exists) {
+      for (const auto &var : rule->vars)
+        renamings[var] = var;
+      quantifiers.emplace_back(rule->type, std::move(rule->vars));
+      rule = rule->operands[0];
+    }
+  } else {
+    while (rule->type == Type::forall || rule->type == Type::exists) {
+      // check for renaming
+      std::set<std::string> newVars;
+      for (auto var : rule->vars) {
+        int count = renamings.count(var);
+        if (count == 0) {
+          renamings[var] = var;
+          newVars.insert(var);
+        } else {
+          auto newName = var + std::to_string(count);
+          renamings[newName] = var;
+          rule->operands[0]->renameVariable(var, newName);
+          newVars.insert(newName);
+        }
+      }
+      if (!newVars.empty())
+        quantifiers.emplace_back(rule->type, std::move(newVars));
+      rule = rule->operands[0];
+    }
+  }
+  return rule;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -68,12 +69,22 @@ public:
   // checks weither this rule contains free vars
   std::set<std::string> getFreeVars() const;
 
+  // rename free variable in this rule globally
+  void renameVariable(const std::string &oldName, const std::string &newName);
+
   friend bool contraryPair(const Rule &left, const Rule &right);
 
 private:
   ptr inverseToNormalForm();
   ptr conjunctionToNormalForm();
   ptr disjunctionToNormalForm();
+  ptr quantifierToNormalForm();
+
+  // extracts quantifiers at front with possible renamings
+  ptr extractFrontQuantifiers(
+      std::map<std::string, std::string> &renamings,
+      std::vector<std::pair<Type, std::set<std::string>>> &quantifiers,
+      ptr rule);
 
   Type type;
   std::string value;

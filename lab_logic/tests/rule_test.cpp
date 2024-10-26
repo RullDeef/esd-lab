@@ -167,3 +167,32 @@ TEST(RuleTests, differentPredicates) {
 
   EXPECT_EQ(expected, actual);
 }
+
+TEST(RuleTests, simpleQuantifiers) {
+  auto text = "P(X) & \\forall(Y) R(Y) + \\exists (Y) Q(Y, Z)";
+  Rule::ptr rule;
+
+  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+
+  rule = rule->toNormalForm();
+
+  auto expected =
+      "\\forall(Y) (\\exists(Y1) ((P(X) + Q(Y1, Z)) & (R(Y) + Q(Y1, Z))))";
+  auto actual = rule->toString();
+
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(RuleTests, redundantVars) {
+  auto text = "\\forall(X, Y, Z) (P(X) + \\forall(Z, W) Q(Y))";
+  Rule::ptr rule;
+
+  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+
+  rule = rule->toNormalForm();
+
+  auto expected = "\\forall(X, Y) (P(X) + Q(Y))";
+  auto actual = rule->toString();
+
+  EXPECT_EQ(expected, actual);
+}
