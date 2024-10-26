@@ -196,3 +196,17 @@ TEST(RuleTests, redundantVars) {
 
   EXPECT_EQ(expected, actual);
 }
+
+TEST(RuleTests, transitivity) {
+  auto text = "(gt(X, Y) & gt(Y, Z)) -> gt(X, Z)";
+  Rule::ptr rule;
+
+  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+
+  rule = rule->toNormalForm();
+
+  auto expected = "~gt(X, Y) + ~gt(Y, Z) + gt(X, Z)";
+  auto actual = rule->toString();
+
+  EXPECT_EQ(expected, actual);
+}

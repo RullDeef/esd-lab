@@ -10,7 +10,7 @@ std::list<Rule::ptr> parseRules(const std::string &line) {
   std::string ruleString;
   std::istringstream ss(line);
   while (ss.good()) {
-    std::getline(ss, ruleString, ',');
+    std::getline(ss, ruleString, ';');
     rules.push_back(RuleParser().Parse(ruleString.c_str()));
   }
   return rules;
@@ -22,7 +22,7 @@ void repl() {
   std::list<Rule::ptr> axioms;
   Rule::ptr conclusion;
   while (true) {
-    std::cout << "enter axioms (comma-separated): ";
+    std::cout << "enter axioms (colon-separated): ";
     if (!std::getline(std::cin, line))
       break;
     try {

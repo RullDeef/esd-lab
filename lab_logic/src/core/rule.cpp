@@ -9,9 +9,9 @@
 
 bool contraryPair(const Rule &left, const Rule &right) {
   if (left.type == Rule::Type::inverse && right.type == Rule::Type::atom)
-    return left.operands[0]->value == right.value;
+    return left.operands[0]->toString() == right.toString();
   if (left.type == Rule::Type::atom && right.type == Rule::Type::inverse)
-    return left.value == right.operands[0]->value;
+    return left.toString() == right.operands[0]->toString();
   return false;
 }
 
