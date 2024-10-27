@@ -65,8 +65,9 @@ public:
   std::list<ptr> getDisjunctionsList() const;
 
   Type getType() const { return type; }
-  std::string getValue() const { return value; }
-  std::vector<ptr> getOperands() const { return operands; }
+  const std::string &getValue() const { return value; }
+  const std::set<std::string> &getVars() const { return vars; }
+  const std::vector<ptr> &getOperands() const { return operands; }
 
   // checks weither this rule contains free vars
   std::set<std::string> getFreeVars() const;

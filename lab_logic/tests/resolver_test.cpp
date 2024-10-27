@@ -48,3 +48,17 @@ TEST(ResolverTest, equality) {
   bool satisfied = Resolver().Implies(Rule::createTrue(), target);
   ASSERT_TRUE(satisfied);
 }
+
+TEST(ResolverTest, predicatesSimple) {
+  std::list<Rule::ptr> axioms;
+  Rule::ptr target;
+
+  EXPECT_NO_THROW(
+      axioms.push_back(RuleParser().Parse("\\forall(X) (P(X) -> Q(X))")));
+  EXPECT_NO_THROW(axioms.push_back(RuleParser().Parse("P(a)")));
+
+  EXPECT_NO_THROW(target = RuleParser().Parse("Q(a)"));
+
+  bool satisfied = Resolver().Implies(axioms, target);
+  ASSERT_TRUE(satisfied);
+}

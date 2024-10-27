@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <string>
 
 struct DisjunctionComparator {
   bool operator()(const Rule::ptr &left, const Rule::ptr &right) const {
@@ -124,13 +125,28 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   if (target->toString() == "0")
     return false;
 
+  // привести правила к приведенной нормальной форме и избавиться от кванторов
+  if (source) {
+    source = source->toNormalForm();
+    int renamedVars = 0;
+    while (source->getType() == Rule::Type::exists ||
+           source->getType() == Rule::Type::forall) {
+      if (source->getType() == Rule::Type::forall)
+        source = source->getOperands()[0];
+      else {
+        auto rule = source->getOperands()[0];
+        for (auto var : source->getVars())
+          rule->renameVariable(var, "tmp" + std::to_string(renamedVars++));
+        source = rule;
+      }
+    }
+  }
+  target = Rule::createInverse(target)->toNormalForm();
+
   // выделить список элементарных дизъюнктов
-  m_axiomSet =
-      source
-          ? disjunctionsTransform(source->toNormalForm()->getDisjunctionsList())
-          : std::list<std::pair<Rule::ptr, Substitution>>{};
-  m_referenceSet = disjunctionsTransform(
-      Rule::createInverse(target)->toNormalForm()->getDisjunctionsList());
+  m_axiomSet = source ? disjunctionsTransform(source->getDisjunctionsList())
+                      : std::list<std::pair<Rule::ptr, Substitution>>{};
+  m_referenceSet = disjunctionsTransform(target->getDisjunctionsList());
 
   // отсортировать списки в порядке возрастания кол-ва атомов
   m_axiomSet.sort(DisjunctionComparator{});
