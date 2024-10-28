@@ -125,23 +125,11 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   if (target->toString() == "0")
     return false;
 
-  // привести правила к приведенной нормальной форме и избавиться от кванторов
-  if (source) {
-    source = source->toNormalForm();
-    int renamedVars = 0;
-    while (source->getType() == Rule::Type::exists ||
-           source->getType() == Rule::Type::forall) {
-      if (source->getType() == Rule::Type::forall)
-        source = source->getOperands()[0];
-      else {
-        auto rule = source->getOperands()[0];
-        for (auto var : source->getVars())
-          rule->renameVariable(var, "tmp" + std::to_string(renamedVars++));
-        source = rule;
-      }
-    }
-  }
-  target = Rule::createInverse(target)->toNormalForm();
+  // привести правила к сколемовской нормальной форме
+  int replacementCounter = 0;
+  if (source)
+    source = source->toScolemForm(&replacementCounter);
+  target = Rule::createInverse(target)->toScolemForm(&replacementCounter);
 
   // выделить список элементарных дизъюнктов
   m_axiomSet = source ? disjunctionsTransform(source->getDisjunctionsList())

@@ -35,6 +35,7 @@ public:
   static ptr createTrue();
   static ptr createFalse();
   static ptr createAtom(std::string value);
+  static ptr createTerm(std::string func, std::vector<std::string> vars);
   static ptr createPredicate(std::string name, std::vector<ptr> operands);
   static ptr createInverse(ptr rule);
   static ptr createConjunction(ptr left, ptr right);
@@ -60,6 +61,7 @@ public:
   std::string toString() const;
 
   ptr toNormalForm();
+  ptr toScolemForm(int *replacementCounter = nullptr);
 
   // appliable only to rules in conjunctive normal form
   std::list<ptr> getDisjunctionsList() const;
@@ -74,6 +76,7 @@ public:
 
   // rename free variable in this rule globally
   void renameVariable(const std::string &oldName, const std::string &newName);
+  void replaceVariable(const std::string &varName, ptr term);
 
   friend bool contraryPair(const Rule &left, const Rule &right);
 

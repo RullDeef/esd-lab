@@ -62,3 +62,27 @@ TEST(ResolverTest, predicatesSimple) {
   bool satisfied = Resolver().Implies(axioms, target);
   ASSERT_TRUE(satisfied);
 }
+
+TEST(ResolverTest, scolemForm) {
+  /**
+   * Задачи из
+   * http://logic.math.msu.ru/wp-content/uploads/vml/2008/t34predicat.pdf
+   *
+   * 2. Доказать, что формула
+   *
+   *   \forall(x) \exists(y) P(x, y) & \forall(x, y) (P(x, y) -> ~P(y, x)) &
+   *   & \forall(x, y, z) (P(x, y) -> (P(y, z) -> P(x, z)))
+   *
+   *   выполнима [, но не выполнима ни в какой конечной модели].
+   */
+
+  Rule::ptr target;
+
+  EXPECT_NO_THROW(target = RuleParser().Parse(
+                      "\\forall(X) \\exists(Y) P(X, Y) & \\forall(X, Y) (P(X, "
+                      "Y) -> ~P(Y, X)) & \\forall(X, Y, Z) (P(X, Y) -> (P(Y, "
+                      "Z) -> P(X, Z)))"));
+
+  bool satisfied = Resolver().Implies(nullptr, target);
+  ASSERT_TRUE(satisfied);
+}

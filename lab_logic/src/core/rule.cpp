@@ -4,6 +4,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -49,6 +50,13 @@ Rule::ptr Rule::createFalse() {
 
 Rule::ptr Rule::createAtom(std::string value) {
   return std::make_shared<Rule>(std::move(value));
+}
+
+Rule::ptr Rule::createTerm(std::string func, std::vector<std::string> vars) {
+  std::vector<ptr> operands;
+  for (auto &var : vars)
+    operands.push_back(createAtom(std::move(var)));
+  return std::make_shared<Rule>(std::move(func), std::move(operands));
 }
 
 Rule::ptr Rule::createPredicate(std::string name, std::vector<ptr> operands) {
@@ -244,6 +252,33 @@ void Rule::renameVariable(const std::string &oldName,
   }
 }
 
+void Rule::replaceVariable(const std::string &varName, Rule::ptr term) {
+  switch (type) {
+  case Type::constant:
+    break;
+  case Type::atom:
+    for (auto &op : operands) {
+      if (op->operands.empty() && op->value == varName)
+        op = term;
+      else
+        op->replaceVariable(varName, term);
+    }
+    break;
+  case Type::inverse:
+  case Type::conjunction:
+  case Type::disjunction:
+    for (auto &op : operands)
+      op->replaceVariable(varName, term);
+    break;
+  case Type::exists:
+  case Type::forall:
+    if (vars.count(varName) == 0)
+      for (auto &op : operands)
+        op->replaceVariable(varName, term);
+    break;
+  }
+}
+
 Rule::ptr Rule::toNormalForm() {
   if (isCNF)
     return shared_from_this();
@@ -403,6 +438,30 @@ Rule::ptr Rule::quantifierToNormalForm() {
   if (newVars.empty())
     return rule;
   return std::make_shared<Rule>(type, std::vector{rule}, newVars);
+}
+
+Rule::ptr Rule::toScolemForm(int *replacementCounter) {
+  auto rule = toNormalForm();
+
+  int replacementCounterLocal = 0; // f0(...), f1(...), ....
+  if (replacementCounter == nullptr)
+    replacementCounter = &replacementCounterLocal;
+  std::vector<std::string> vars;
+  while (rule->type == Type::exists || rule->type == Type::forall) {
+    if (rule->type == Type::exists) {
+      for (auto var : rule->vars) {
+        rule->operands[0]->replaceVariable(
+            var, createTerm("f" + std::to_string(*replacementCounter), vars));
+        ++*replacementCounter;
+      }
+    } else {
+      for (auto var : rule->vars)
+        vars.push_back(var);
+    }
+    rule = rule->operands[0];
+  }
+
+  return rule;
 }
 
 Rule::ptr Rule::extractFrontQuantifiers(
