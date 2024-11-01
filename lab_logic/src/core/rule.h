@@ -81,8 +81,9 @@ public:
   std::set<std::string> getFreeVars() const;
 
   // rename free variable in this rule globally
-  void renameVariable(const std::string &oldName, const std::string &newName);
-  void replaceVariable(const std::string &varName, ptr term);
+  ptr withRenamedVariable(const std::string &oldName,
+                          const std::string &newName);
+  ptr withReplacedVariable(const std::string &varName, ptr term);
 
   friend bool contraryPair(const Rule &left, const Rule &right);
 

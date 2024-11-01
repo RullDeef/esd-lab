@@ -54,10 +54,10 @@ TEST(ResolverTest, predicatesSimple) {
   Rule::ptr target;
 
   EXPECT_NO_THROW(
-      axioms.push_back(RuleParser().Parse("\\forall(X) (P(X) -> Q(X))")));
-  EXPECT_NO_THROW(axioms.push_back(RuleParser().Parse("P(a)")));
+      axioms.push_back(RuleParser().Parse("\\forall(x) (P(x) -> Q(x))")));
+  EXPECT_NO_THROW(axioms.push_back(RuleParser().Parse("P(A)")));
 
-  EXPECT_NO_THROW(target = RuleParser().Parse("Q(a)"));
+  EXPECT_NO_THROW(target = RuleParser().Parse("Q(A)"));
 
   bool satisfied = Resolver().Implies(axioms, target);
   ASSERT_TRUE(satisfied);
@@ -89,9 +89,9 @@ TEST(ResolverTest, scolemForm) {
 }
 
 TEST(ResolverTest, diffExists) {
-  std::list<Rule::ptr> axioms = {RuleParser().Parse("A -> \\exists(X) P(X)"),
-                                 RuleParser().Parse("\\exists(X) (Q(X) -> A)")};
-  Rule::ptr target = RuleParser().Parse("\\exists(X) (Q(X) -> P(X))");
+  std::list<Rule::ptr> axioms = {RuleParser().Parse("A -> \\exists(x) P(x)"),
+                                 RuleParser().Parse("\\exists(x) (Q(x) -> A)")};
+  Rule::ptr target = RuleParser().Parse("\\exists(x) (Q(x) -> P(x))");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_FALSE(satisfied);
@@ -99,9 +99,9 @@ TEST(ResolverTest, diffExists) {
 
 TEST(ResolverTest, contrapositionPredicates) {
   std::list<Rule::ptr> axioms = {
-      RuleParser().Parse("\\forall(X) (P(X) -> \\exists(Y) Q(X, Y))"),
-      RuleParser().Parse("~(\\exists(X) \\forall(Y) Q(Y, X))")};
-  Rule::ptr target = RuleParser().Parse("\\exists(X) ~P(X)");
+      RuleParser().Parse("\\forall(x) (P(x) -> \\exists(y) Q(x, y))"),
+      RuleParser().Parse("~(\\exists(x) \\forall(y) Q(y, x))")};
+  Rule::ptr target = RuleParser().Parse("\\exists(x) ~P(x)");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_TRUE(satisfied);
@@ -110,7 +110,7 @@ TEST(ResolverTest, contrapositionPredicates) {
 TEST(ResolverTest, transitivity) {
   std::list<Rule::ptr> axioms = {
       // P(x, y) <=> x < y --- is transitive relation
-      RuleParser().Parse("\\forall(X, Y, Z) (P(X, Z) & P(Z, Y) -> P(X, Y))"),
+      RuleParser().Parse("\\forall(x, y, z) (P(x, z) & P(z, y) -> P(x, y))"),
       // some facts
       RuleParser().Parse("P(3, 4) & P(4, 5) & P(5, 6)"),
   };
@@ -118,4 +118,19 @@ TEST(ResolverTest, transitivity) {
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_TRUE(satisfied);
+}
+
+TEST(ResolverTest, lectionEx1) {
+  std::list<Rule::ptr> axioms = {
+      RuleParser().Parse("\\forall(x) (S(x) + M(x))"),
+      RuleParser().Parse("~(\\exists(x1) (M(x1) & L(x1, Rain)))"),
+      RuleParser().Parse("\\forall(x2) L(x2, Snow)"),
+      RuleParser().Parse("\\forall(y) (L(Lena, y) = ~L(Petya, y))"),
+      RuleParser().Parse("L(Petya, Rain)"),
+      RuleParser().Parse("L(Petya, Snow)"),
+  };
+  Rule::ptr target = RuleParser().Parse("\\exists(x3) (M(x3) & ~S(x3))");
+
+  bool satisfied = Resolver().Implies(axioms, target);
+  EXPECT_FALSE(satisfied);
 }

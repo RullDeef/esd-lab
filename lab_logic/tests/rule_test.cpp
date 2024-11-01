@@ -169,7 +169,7 @@ TEST(RuleTests, differentPredicates) {
 }
 
 TEST(RuleTests, simpleQuantifiers) {
-  auto text = "P(X) & \\forall(Y) R(Y) + \\exists (Y) Q(Y, Z)";
+  auto text = "P(X) & \\forall(y) R(y) + \\exists (y) Q(y, Z)";
   Rule::ptr rule;
 
   EXPECT_NO_THROW(rule = RuleParser().Parse(text));
@@ -177,21 +177,21 @@ TEST(RuleTests, simpleQuantifiers) {
   rule = rule->toNormalForm();
 
   auto expected =
-      "\\forall(Y) (\\exists(Y1) ((P(X) + Q(Y1, Z)) & (R(Y) + Q(Y1, Z))))";
+      "\\forall(y) (\\exists(y1) ((P(X) + Q(y1, Z)) & (R(y) + Q(y1, Z))))";
   auto actual = rule->toString();
 
   EXPECT_EQ(expected, actual);
 }
 
 TEST(RuleTests, redundantVars) {
-  auto text = "\\forall(X, Y, Z) (P(X) + \\forall(Z, W) Q(Y))";
+  auto text = "\\forall(x, y, z) (P(x) + \\forall(z, w) Q(y))";
   Rule::ptr rule;
 
   EXPECT_NO_THROW(rule = RuleParser().Parse(text));
 
   rule = rule->toNormalForm();
 
-  auto expected = "\\forall(X, Y) (P(X) + Q(Y))";
+  auto expected = "\\forall(x, y) (P(x) + Q(y))";
   auto actual = rule->toString();
 
   EXPECT_EQ(expected, actual);
@@ -209,4 +209,28 @@ TEST(RuleTests, transitivity) {
   auto actual = rule->toString();
 
   EXPECT_EQ(expected, actual);
+}
+
+TEST(RuleTests, toNormalIdempotent) {
+  auto rule =
+      RuleParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
+
+  auto ruleBefore = rule->toString();
+  rule->toNormalForm();
+  rule->toNormalForm();
+  auto ruleAfter = rule->toString();
+
+  EXPECT_EQ(ruleBefore, ruleAfter);
+}
+
+TEST(RuleTests, toScolemForm) {
+  auto rule =
+      RuleParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
+
+  auto ruleBefore = rule->toString();
+  rule->toScolemForm();
+  rule->toScolemForm();
+  auto ruleAfter = rule->toString();
+
+  EXPECT_EQ(ruleBefore, ruleAfter);
 }

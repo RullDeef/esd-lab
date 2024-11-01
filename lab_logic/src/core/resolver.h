@@ -3,6 +3,7 @@
 #include "rule.h"
 #include "substitution.h"
 #include <list>
+#include <set>
 
 class Resolver {
 public:
@@ -11,7 +12,8 @@ public:
 
 private:
   std::list<std::pair<Rule::ptr, Substitution>>
-  disjunctionsTransform(std::list<Rule::ptr> disjunctions);
+  disjunctionsTransform(std::list<Rule::ptr> disjunctions,
+                        std::set<std::string> &renamings);
 
   void PrintState();
 

@@ -1,5 +1,6 @@
 #include "rule.h"
 #include <algorithm>
+#include <cctype>
 #include <iterator>
 #include <list>
 #include <map>
@@ -204,7 +205,7 @@ std::set<std::string> Rule::getFreeVars() const {
   } else if (type == Type::atom && !operands.empty()) {
     // recursion base case
     for (auto operand : operands) {
-      if (operand->operands.empty())
+      if (operand->operands.empty() && !std::isupper(operand->value[0]))
         res.insert(operand->value);
       else {
         auto inner = operand->getFreeVars();
@@ -224,58 +225,79 @@ std::set<std::string> Rule::getFreeVars() const {
   return res;
 }
 
-void Rule::renameVariable(const std::string &oldName,
-                          const std::string &newName) {
+Rule::ptr Rule::withRenamedVariable(const std::string &oldName,
+                                    const std::string &newName) {
+  std::vector<ptr> newOperands;
+  std::set<std::string> newVars;
   switch (type) {
   case Type::constant:
-    break;
+    return shared_from_this();
   case Type::atom:
-    for (auto &op : operands) {
-      if (op->operands.empty() && op->value == oldName)
-        op->value = newName;
-      else
-        op->renameVariable(oldName, newName);
+    if (operands.empty())
+      return shared_from_this();
+    else {
+      for (auto op : operands) {
+        if (op->operands.empty() && op->value == oldName)
+          newOperands.push_back(createAtom(newName));
+        else
+          newOperands.push_back(op->withRenamedVariable(oldName, newName));
+      }
+      return createPredicate(value, std::move(newOperands));
     }
     break;
   case Type::inverse:
   case Type::conjunction:
   case Type::disjunction:
     for (auto &op : operands)
-      op->renameVariable(oldName, newName);
-    break;
+      newOperands.push_back(op->withRenamedVariable(oldName, newName));
+    return std::make_shared<Rule>(type, std::move(newOperands));
   case Type::exists:
   case Type::forall:
-    if (vars.count(oldName) == 0)
-      for (auto &op : operands)
-        op->renameVariable(oldName, newName);
-    break;
+    newVars = vars;
+    auto iter = newVars.find(oldName);
+    if (iter != newVars.end()) {
+      newVars.erase(iter);
+      newVars.insert(newName);
+    }
+    for (auto &op : operands)
+      newOperands.push_back(op->withRenamedVariable(oldName, newName));
+    return std::make_shared<Rule>(type, std::move(newOperands), newVars);
   }
 }
 
-void Rule::replaceVariable(const std::string &varName, Rule::ptr term) {
+Rule::ptr Rule::withReplacedVariable(const std::string &varName, ptr term) {
+  std::vector<ptr> newOperands;
   switch (type) {
   case Type::constant:
-    break;
+    return shared_from_this();
   case Type::atom:
-    for (auto &op : operands) {
-      if (op->operands.empty() && op->value == varName)
-        op = term;
-      else
-        op->replaceVariable(varName, term);
+    if (operands.empty())
+      return shared_from_this();
+    else {
+      for (auto &op : operands) {
+        if (op->operands.empty() && op->value == varName)
+          newOperands.push_back(term);
+        else
+          newOperands.push_back(op->withReplacedVariable(varName, term));
+      }
+      return createPredicate(value, std::move(newOperands));
     }
     break;
   case Type::inverse:
   case Type::conjunction:
   case Type::disjunction:
     for (auto &op : operands)
-      op->replaceVariable(varName, term);
-    break;
+      newOperands.push_back(op->withReplacedVariable(varName, term));
+    return std::make_shared<Rule>(type, std::move(newOperands));
   case Type::exists:
   case Type::forall:
-    if (vars.count(varName) == 0)
+    if (vars.count(varName) == 0) {
       for (auto &op : operands)
-        op->replaceVariable(varName, term);
-    break;
+        newOperands.push_back(op->withReplacedVariable(varName, term));
+    } else {
+      newOperands = operands;
+    }
+    return std::make_shared<Rule>(type, std::move(newOperands), vars);
   }
 }
 
@@ -448,17 +470,18 @@ Rule::ptr Rule::toScolemForm(int *replacementCounter) {
     replacementCounter = &replacementCounterLocal;
   std::vector<std::string> vars;
   while (rule->type == Type::exists || rule->type == Type::forall) {
+    ptr next = rule->operands[0];
     if (rule->type == Type::exists) {
       for (auto var : rule->vars) {
-        rule->operands[0]->replaceVariable(
-            var, createTerm("f" + std::to_string(*replacementCounter), vars));
+        next = next->withReplacedVariable(
+            var, createTerm("F" + std::to_string(*replacementCounter), vars));
         ++*replacementCounter;
       }
     } else {
       for (auto var : rule->vars)
         vars.push_back(var);
     }
-    rule = rule->operands[0];
+    rule = next;
   }
 
   return rule;
@@ -487,7 +510,8 @@ Rule::ptr Rule::extractFrontQuantifiers(
         } else {
           auto newName = var + std::to_string(count);
           renamings[newName] = var;
-          rule->operands[0]->renameVariable(var, newName);
+          rule->operands[0] =
+              rule->operands[0]->withRenamedVariable(var, newName);
           newVars.insert(newName);
         }
       }

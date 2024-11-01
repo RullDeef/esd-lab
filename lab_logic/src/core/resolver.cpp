@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <ostream>
 #include <string>
 
 struct DisjunctionComparator {
@@ -28,11 +29,12 @@ static bool startsUpper(const std::string &value) {
 static std::optional<Substitution> unifyTerms(Rule::ptr left, Rule::ptr right,
                                               bool topLevel = true) {
   bool left_predicate = !left->getOperands().empty();
-  bool left_var = !left_predicate && startsUpper(left->getValue()) && !topLevel;
+  bool left_var =
+      !left_predicate && !startsUpper(left->getValue()) && !topLevel;
   bool left_atom = !left_predicate && !left_var;
   bool right_predicate = !right->getOperands().empty();
   bool right_var =
-      !right_predicate && startsUpper(right->getValue()) && !topLevel;
+      !right_predicate && !startsUpper(right->getValue()) && !topLevel;
   bool right_atom = !right_predicate && !right_var;
 
   if (left_atom && right_atom) {
@@ -87,8 +89,21 @@ tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
   // cross apply substitutions
   Substitution sub1 = disjunction1.second;
   Substitution sub2 = disjunction2.second;
-  auto disAtoms1 = disjunction1.first->getOperands();
-  auto disAtoms2 = disjunction2.first->getOperands();
+
+  std::cout << "disj1: " << disjunction1.first->toString() << std::endl;
+  std::cout << "disj2: " << disjunction2.first->toString() << std::endl;
+  std::cout << "sub1: " << sub1.toString() << std::endl;
+  std::cout << "sub2: " << sub2.toString() << std::endl;
+  auto disAtoms1 = sub2.applyTo(disjunction1.first)->getOperands();
+  auto disAtoms2 = sub1.applyTo(disjunction2.first)->getOperands();
+  std::cout << "dis1*: ";
+  for (auto &atom : disAtoms1)
+    std::cout << atom->toString() << ", ";
+  std::cout << std::endl;
+  std::cout << "dis2*: ";
+  for (auto &atom : disAtoms2)
+    std::cout << atom->toString() << ", ";
+  std::cout << std::endl;
 
   std::optional<Substitution> subst;
   for (int i = 0; i < disAtoms1.size(); ++i) {
@@ -119,6 +134,10 @@ bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
   Rule::ptr sourceAnd;
   if (source.size() > 0)
     sourceAnd = Rule::createConjunction(source.begin(), source.end());
+  std::cout << "conjunction res: " << sourceAnd->toString() << std::endl;
+  // std::cout << "normal form: " << sourceAnd->toNormalForm()->toString()
+  // << std::endl;
+  std::cout << "sknf: " << sourceAnd->toScolemForm()->toString() << std::endl;
   return Implies(sourceAnd, target);
 }
 
@@ -135,9 +154,12 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   target = Rule::createInverse(target)->toScolemForm(&replacementCounter);
 
   // выделить список элементарных дизъюнктов
-  m_axiomSet = source ? disjunctionsTransform(source->getDisjunctionsList())
-                      : std::list<std::pair<Rule::ptr, Substitution>>{};
-  m_referenceSet = disjunctionsTransform(target->getDisjunctionsList());
+  std::set<std::string> renamings;
+  m_axiomSet =
+      source ? disjunctionsTransform(source->getDisjunctionsList(), renamings)
+             : std::list<std::pair<Rule::ptr, Substitution>>{};
+  m_referenceSet =
+      disjunctionsTransform(target->getDisjunctionsList(), renamings);
 
   // отсортировать списки в порядке возрастания кол-ва атомов
   m_axiomSet.sort(DisjunctionComparator{});
@@ -221,11 +243,22 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
 }
 
 std::list<std::pair<Rule::ptr, Substitution>>
-Resolver::disjunctionsTransform(std::list<Rule::ptr> disjunctions) {
+Resolver::disjunctionsTransform(std::list<Rule::ptr> disjunctions,
+                                std::set<std::string> &renamings) {
   std::list<std::pair<Rule::ptr, Substitution>> res;
-  for (auto &disjunction : disjunctions)
+  for (auto &disjunction : disjunctions) {
+    // rename variables
+    // for (auto oldVar : disjunction->getFreeVars()) {
+    //   if (renamings.count(oldVar) == 0)
+    //     renamings.insert(oldVar);
+    //   else {
+    //     std::string newVar = "u" + std::to_string(renamings.size());
+    //     disjunction = disjunction->withRenamedVariable(oldVar, newVar);
+    //   }
+    // }
     res.push_back(
         std::make_pair<Rule::ptr, Substitution>(std::move(disjunction), {}));
+  }
   return res;
 }
 

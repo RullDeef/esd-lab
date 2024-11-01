@@ -10,7 +10,7 @@ public:
   Substitution &operator+=(const Substitution &other);
 
   // also changes all contained vars in values
-  Rule::ptr applyTo(Rule::ptr rule);
+  Rule::ptr applyTo(Rule::ptr rule, bool topLevel = true);
 
   bool empty() const;
 
