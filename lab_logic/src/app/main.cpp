@@ -41,7 +41,7 @@ void repl() {
       continue;
     }
     if (Resolver().Implies(axioms, conclusion))
-      std::cout << "resoved: yes\n";
+      std::cout << "resolved: yes\n";
     else
       std::cout << "resolved: no\n";
   }

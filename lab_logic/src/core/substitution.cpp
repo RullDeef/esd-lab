@@ -1,4 +1,5 @@
 #include "substitution.h"
+#include <memory>
 #include <stdexcept>
 
 Substitution &Substitution::operator+=(const Substitution &other) {
@@ -15,6 +16,12 @@ Substitution &Substitution::operator+=(const Substitution &other) {
 Rule::ptr Substitution::applyTo(Rule::ptr rule) {
   if (rule->getType() == Rule::Type::inverse)
     return Rule::createInverse(applyTo(rule->getOperands()[0]));
+  if (rule->getType() == Rule::Type::disjunction) {
+    auto operands = rule->getOperands();
+    for (auto &op : operands)
+      op = applyTo(op);
+    return std::make_shared<Rule>(Rule::Type::disjunction, std::move(operands));
+  }
   if (rule->type != Rule::Type::atom)
     throw std::runtime_error("invalid rule type for substitution");
   if (rule->operands.empty())

@@ -84,6 +84,9 @@ static std::optional<Substitution> unifyInversePair(Rule::ptr left,
 static std::optional<std::pair<Rule::ptr, Substitution>>
 tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
            const std::pair<Rule::ptr, Substitution> &disjunction2) {
+  // cross apply substitutions
+  Substitution sub1 = disjunction1.second;
+  Substitution sub2 = disjunction2.second;
   auto disAtoms1 = disjunction1.first->getOperands();
   auto disAtoms2 = disjunction2.first->getOperands();
 
@@ -106,8 +109,8 @@ tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
     return std::nullopt;
   for (auto &atom : disAtoms1)
     atom = subst->applyTo(std::move(atom));
-  *subst += disjunction1.second;
-  *subst += disjunction2.second;
+  *subst += sub1;
+  *subst += sub2;
   auto rule = std::make_shared<Rule>(Rule::Type::disjunction, disAtoms1);
   return std::make_pair(rule, *subst);
 }
@@ -142,8 +145,10 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
 
   PrintState();
 
+  int retryCounter = 0;
+
   // реализуем стратегию с опорным множеством
-  while (!m_referenceSet.empty()) { // && !m_axiomSet.empty()) {
+  while (!m_referenceSet.empty() && retryCounter <= m_referenceSet.size()) {
     // берем один дизъюнкт из опорного множества и ищем ему пару среди
     // дизъюнктов опорного множества и, если не нашли - ищем в аксиомах.
     auto ref = m_referenceSet.front();
@@ -164,9 +169,10 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
         std::cout << "resolved with refset: " << ref.first->toString()
                   << " and " << pair->first->toString()
                   << " (subst: " << pair->second.toString() << ")" << std::endl;
-        m_referenceSet.erase(pair);
+        // m_referenceSet.erase(pair);
         m_referenceSet.push_front(*res);
         PrintState();
+        retryCounter = 0;
         break;
       }
       pair++;
@@ -188,12 +194,21 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
                     << " and " << pair->first->toString()
                     << " (subst: " << res->second.toString() << ")"
                     << std::endl;
-          m_axiomSet.erase(pair);
+          // m_axiomSet.erase(pair);
           m_referenceSet.push_front(*res);
           PrintState();
+          retryCounter = 0;
           break;
         }
         pair++;
+      }
+      if (pair == m_axiomSet.end()) {
+        // не нашли пару нигде - если дизъюнкт содержит переменные - засовываем
+        // его обратно в конец опорного множества
+        if (!ref.first->getFreeVars().empty() || !ref.second.empty()) {
+          m_referenceSet.push_back(std::move(ref));
+          retryCounter++;
+        }
       }
     }
     // если ничего не нашли - значит резолюция для данного дизъюнкта невозможна

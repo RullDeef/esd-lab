@@ -46,6 +46,12 @@ public:
                                             createConjunction(begin, end));
   }
   static ptr createDisjunction(ptr left, ptr right);
+  template <typename Iter> static ptr createDisjunction(Iter begin, Iter end) {
+    auto first = *begin++;
+    return begin == end ? std::move(first)
+                        : createDisjunction(std::move(first),
+                                            createDisjunction(begin, end));
+  }
   static ptr createImplication(ptr from, ptr to);
   static ptr createEquality(ptr left, ptr right);
 
