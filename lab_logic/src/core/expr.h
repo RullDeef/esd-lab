@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 
-class Rule : public std::enable_shared_from_this<Rule> {
+class Expr : public std::enable_shared_from_this<Expr> {
 public:
   enum class Type {
     constant,
@@ -20,17 +20,17 @@ public:
     exists, // value used for variable name
   };
 
-  using ptr = std::shared_ptr<Rule>;
+  using ptr = std::shared_ptr<Expr>;
 
   // general constructor for operators
-  Rule(Type type, std::vector<ptr> operands, std::set<std::string> vars = {});
+  Expr(Type type, std::vector<ptr> operands, std::set<std::string> vars = {});
 
   // constants
-  Rule(std::true_type);
-  Rule(std::false_type);
+  Expr(std::true_type);
+  Expr(std::false_type);
 
   // atom/predicate constructor
-  Rule(std::string name, std::vector<ptr> operands = {});
+  Expr(std::string name, std::vector<ptr> operands = {});
 
   static ptr createTrue();
   static ptr createFalse();
@@ -55,11 +55,11 @@ public:
   static ptr createImplication(ptr from, ptr to);
   static ptr createEquality(ptr left, ptr right);
 
-  static ptr createExists(std::set<std::string> vars, Rule::ptr rule);
-  static ptr createForAll(std::set<std::string> vars, Rule::ptr rule);
+  static ptr createExists(std::set<std::string> vars, Expr::ptr rule);
+  static ptr createForAll(std::set<std::string> vars, Expr::ptr rule);
 
-  bool operator==(const Rule &other) const;
-  bool operator!=(const Rule &other) const;
+  bool operator==(const Expr &other) const;
+  bool operator!=(const Expr &other) const;
 
   bool operator==(const std::string &val) const;
   bool operator!=(const std::string &val) const;
@@ -85,7 +85,7 @@ public:
                           const std::string &newName);
   ptr withReplacedVariable(const std::string &varName, ptr term);
 
-  friend bool contraryPair(const Rule &left, const Rule &right);
+  friend bool contraryPair(const Expr &left, const Expr &right);
 
 private:
   ptr inverseToNormalForm();
@@ -111,10 +111,10 @@ private:
   friend class Substitution;
 };
 
-inline bool operator==(const std::string &str, const Rule &rule) {
+inline bool operator==(const std::string &str, const Expr &rule) {
   return rule == str;
 }
 
-inline bool operator!=(const std::string &str, const Rule &rule) {
+inline bool operator!=(const std::string &str, const Expr &rule) {
   return rule != str;
 }

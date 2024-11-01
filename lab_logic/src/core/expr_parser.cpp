@@ -1,103 +1,100 @@
-#include "rule_parser.h"
-#include <cctype>
+#include "expr_parser.h"
 #include <cstring>
-#include <iostream>
-#include <optional>
 #include <stdexcept>
 
 /*
 
-Rule Grammar in EBNF:
+Expr Grammar in EBNF:
 
-<rule>      ::= <equ-rule>
-<equ-rule>  ::= <disj-rule> [<eq-sign> <equ-rule>]
-<disj-rule> ::= <impl-rule> ['+' <disj-rule>]
-<impl-rule> ::= <conj-rule> ['->' <impl-rule>]
-<conj-rule> ::= <term-rule> ['&' <conj-rule>]
-<term-rule> ::= '(' <equ-rule> ')' | <neg> | <atom>
-<neg>       ::= '~' <term-rule>
+<expr>      ::= <equ-expr>
+<equ-expr>  ::= <disj-expr> [<eq-sign> <equ-expr>]
+<disj-expr> ::= <impl-expr> ['+' <disj-expr>]
+<impl-expr> ::= <conj-expr> ['->' <impl-expr>]
+<conj-expr> ::= <term-expr> ['&' <conj-expr>]
+<term-expr> ::= '(' <equ-expr> ')' | <neg> | <atom>
+<neg>       ::= '~' <term-expr>
 <equ-sign>  ::= '==' | '=' | '<=>' | '<->'
-<neg>       ::= '~' <term-rule>
+<neg>       ::= '~' <term-expr>
 <equ-sign>  ::= '==' | '=' | '<=>' | '<->'
 <atom>      ::= string [ '(' <atom-list> ')' | <atom-list> ]
 <atom-list> ::= <atom> [ ',' <atom-list> ]
 
 */
 
-Rule::ptr RuleParser::Parse(const char *str) {
+Expr::ptr ExprParser::Parse(const char *str) {
   m_Source = str;
   m_pos = 0;
-  auto res = ParseEquRule();
+  auto res = ParseEquExpr();
   if (SkipWhitespace())
-    RaiseError("rule not fully parsed");
+    RaiseError("expr not fully parsed");
   m_Source = nullptr;
   return res;
 }
 
-Rule::ptr RuleParser::ParseEquRule() {
-  auto left = ParseDisjRule();
+Expr::ptr ExprParser::ParseEquExpr() {
+  auto left = ParseDisjExpr();
   if (!Eat("==") && !Eat("=") && !Eat("<=>") && !Eat("<->"))
     return left;
-  auto right = ParseEquRule();
-  return Rule::createEquality(left, right);
+  auto right = ParseEquExpr();
+  return Expr::createEquality(left, right);
 }
 
-Rule::ptr RuleParser::ParseDisjRule() {
-  auto left = ParseImplRule();
+Expr::ptr ExprParser::ParseDisjExpr() {
+  auto left = ParseImplExpr();
   if (!Eat("+"))
     return left;
-  auto right = ParseDisjRule();
-  return Rule::createDisjunction(left, right);
+  auto right = ParseDisjExpr();
+  return Expr::createDisjunction(left, right);
 }
 
-Rule::ptr RuleParser::ParseImplRule() {
-  auto left = ParseConjRule();
+Expr::ptr ExprParser::ParseImplExpr() {
+  auto left = ParseConjExpr();
   if (!Eat("->"))
     return left;
-  auto right = ParseImplRule();
-  return Rule::createImplication(left, right);
+  auto right = ParseImplExpr();
+  return Expr::createImplication(left, right);
 }
 
-Rule::ptr RuleParser::ParseConjRule() {
-  auto left = ParseQuantRule();
+Expr::ptr ExprParser::ParseConjExpr() {
+  auto left = ParseQuantExpr();
   if (!Eat("&"))
     return left;
-  auto right = ParseConjRule();
-  return Rule::createConjunction(left, right);
+  auto right = ParseConjExpr();
+  return Expr::createConjunction(left, right);
 }
 
-Rule::ptr RuleParser::ParseQuantRule() {
+Expr::ptr ExprParser::ParseQuantExpr() {
   if (!SkipWhitespace())
     RaiseError("quantifier non-term expected");
   if (Eat("\\exists")) {
     auto vars = ParseVarList();
-    auto rule = ParseQuantRule();
-    return Rule::createExists(std::move(vars), std::move(rule));
+    auto expr = ParseQuantExpr();
+    return Expr::createExists(std::move(vars), std::move(expr));
   } else if (Eat("\\forall")) {
     auto vars = ParseVarList();
-    auto rule = ParseQuantRule();
-    return Rule::createForAll(std::move(vars), std::move(rule));
+    auto expr = ParseQuantExpr();
+    return Expr::createForAll(std::move(vars), std::move(expr));
   }
-  return ParseTermRule();
+  return ParseTermExpr();
 }
 
-Rule::ptr RuleParser::ParseTermRule() {
+Expr::ptr ExprParser::ParseTermExpr() {
   if (Eat("(")) {
-    auto rule = ParseEquRule();
+    auto expr = ParseEquExpr();
     if (!Eat(")"))
       RaiseError("unmatched parenthesis");
-    return rule;
+    return expr;
   } else if (Eat("~"))
-    return Rule::createInverse(ParseTermRule());
+    return Expr::createInverse(ParseTermExpr());
   return ParseAtom();
 }
 
-Rule::ptr RuleParser::ParseAtom() {
+Expr::ptr ExprParser::ParseAtom() {
   auto name = ParseIdent();
   if (!name)
     RaiseError("atom expected");
   SkipWhitespace();
-  std::vector<Rule::ptr> operands;
+  std::vector<Expr::ptr> operands;
   // parse predicate arguments
   if (Eat("(")) {
     do {
@@ -107,10 +104,10 @@ Rule::ptr RuleParser::ParseAtom() {
     if (!Eat(")"))
       RaiseError("')' expected");
   }
-  return Rule::createPredicate(std::move(*name), std::move(operands));
+  return Expr::createPredicate(std::move(*name), std::move(operands));
 }
 
-std::set<std::string> RuleParser::ParseVarList() {
+std::set<std::string> ExprParser::ParseVarList() {
   if (!Eat("("))
     RaiseError("'(' expected");
   std::set<std::string> vars;
@@ -125,7 +122,7 @@ std::set<std::string> RuleParser::ParseVarList() {
   return vars;
 }
 
-std::optional<std::string> RuleParser::ParseIdent() {
+std::optional<std::string> ExprParser::ParseIdent() {
   SkipWhitespace();
   size_t size = 0;
   while (m_Source[m_pos + size] && std::isalnum(m_Source[m_pos + size]))
@@ -137,25 +134,25 @@ std::optional<std::string> RuleParser::ParseIdent() {
   return std::move(name);
 }
 
-bool RuleParser::Peek(const char *expect) {
+bool ExprParser::Peek(const char *expect) {
   return SkipWhitespace() &&
          strncmp(m_Source + m_pos, expect, strlen(expect)) == 0;
 }
 
-bool RuleParser::Eat(const char *value) {
+bool ExprParser::Eat(const char *value) {
   if (!Peek(value))
     return false;
   m_pos += strlen(value);
   return true;
 }
 
-bool RuleParser::SkipWhitespace() {
+bool ExprParser::SkipWhitespace() {
   while (m_Source[m_pos] && m_Source[m_pos] == ' ')
     m_pos++;
   return m_Source[m_pos] != '\0';
 }
 
-void RuleParser::RaiseError(const char *message) {
+void ExprParser::RaiseError(const char *message) {
   std::string message_str = message;
   message_str += " at " + std::to_string(m_pos);
   throw std::runtime_error(message_str);

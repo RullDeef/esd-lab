@@ -1,20 +1,21 @@
 #pragma once
 
-#include "rule.h"
+#include "expr.h"
 #include <optional>
+#include <set>
 
 /*
 
-Rule Grammar in EBNF:
+Expr Grammar in EBNF:
 
-<rule>       ::= <equ-rule>
-<equ-rule>   ::= <disj-rule> <eq-sign> <equ-rule>
-<disj-rule>  ::= <impl-rule> '+' <disj-rule>
-<impl-rule>  ::= <conj-rule> '->' <impl-rule>
-<conj-rule>  ::= <quant-rule> '&' <conj-rule>
-<quant-rule> ::= [ <quant-list> ] <term-rule>
-<term-rule>  ::= '(' <rule> ')' | <neg> | <atom>
-<neg>        ::= '~' <quant-rule>
+<expr>       ::= <equ-expr>
+<equ-expr>   ::= <disj-expr> <eq-sign> <equ-expr>
+<disj-expr>  ::= <impl-expr> '+' <disj-expr>
+<impl-expr>  ::= <conj-expr> '->' <impl-expr>
+<conj-expr>  ::= <quant-expr> '&' <conj-expr>
+<quant-expr> ::= [ <quant-list> ] <term-expr>
+<term-expr>  ::= '(' <expr> ')' | <neg> | <atom>
+<neg>        ::= '~' <quant-expr>
 <equ-sign>   ::= '==' | '=' | '<=>' | '<->'
 <atom>       ::= string [ '(' <atom-list> ')' ]
 <atom-list>  ::= <atom> [ ',' <atom-list> ]
@@ -24,18 +25,18 @@ Rule Grammar in EBNF:
 <var-list>   ::= string [ ',' <var-list> ]
 
 */
-class RuleParser {
+class ExprParser {
 public:
-  Rule::ptr Parse(const char *str);
+  Expr::ptr Parse(const char *str);
 
 private:
-  Rule::ptr ParseEquRule();
-  Rule::ptr ParseDisjRule();
-  Rule::ptr ParseImplRule();
-  Rule::ptr ParseConjRule();
-  Rule::ptr ParseQuantRule();
-  Rule::ptr ParseTermRule();
-  Rule::ptr ParseAtom();
+  Expr::ptr ParseEquExpr();
+  Expr::ptr ParseDisjExpr();
+  Expr::ptr ParseImplExpr();
+  Expr::ptr ParseConjExpr();
+  Expr::ptr ParseQuantExpr();
+  Expr::ptr ParseTermExpr();
+  Expr::ptr ParseAtom();
 
   // (var1, var2, ...) with parentheses
   std::set<std::string> ParseVarList();

@@ -1,27 +1,27 @@
+#include "expr_parser.h"
 #include "resolver.h"
-#include "rule_parser.h"
 #include <exception>
 #include <iostream>
 #include <sstream>
 
-std::list<Rule::ptr> parseRules(const std::string &line) {
+std::list<Expr::ptr> parseRules(const std::string &line) {
   if (line.empty())
     return {};
-  std::list<Rule::ptr> rules;
+  std::list<Expr::ptr> rules;
   std::string ruleString;
   std::istringstream ss(line);
   while (ss.good()) {
     std::getline(ss, ruleString, ';');
-    rules.push_back(RuleParser().Parse(ruleString.c_str()));
+    rules.push_back(ExprParser().Parse(ruleString.c_str()));
   }
   return rules;
 }
 
 void replResolve() {
   std::string line;
-  RuleParser parser;
-  std::list<Rule::ptr> axioms;
-  Rule::ptr conclusion;
+  ExprParser parser;
+  std::list<Expr::ptr> axioms;
+  Expr::ptr conclusion;
   std::cout << "enter 'end' to exit repl\n";
   while (true) {
     std::cout << "enter axioms (colon-separated): ";
@@ -51,9 +51,9 @@ void replResolve() {
 
 void replUnify() {
   std::string line;
-  RuleParser parser;
-  Rule::ptr left;
-  Rule::ptr right;
+  ExprParser parser;
+  Expr::ptr left;
+  Expr::ptr right;
   std::cout << "enter 'end' to exit repl\n";
   while (true) {
     std::cout << "enter first atom: ";

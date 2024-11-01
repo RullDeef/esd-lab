@@ -1,63 +1,63 @@
+#include "expr_parser.h"
 #include "resolver.h"
-#include "rule_parser.h"
 #include <gtest/gtest.h>
 #include <list>
 
 TEST(ResolverTest, SimpleCase) {
-  std::list<Rule::ptr> sources = {
-      Rule::createImplication(Rule::createAtom("A"), Rule::createAtom("B")),
-      Rule::createAtom("A"),
+  std::list<Expr::ptr> sources = {
+      Expr::createImplication(Expr::createAtom("A"), Expr::createAtom("B")),
+      Expr::createAtom("A"),
   };
-  Rule::ptr target = Rule::createAtom("B");
+  Expr::ptr target = Expr::createAtom("B");
 
   bool satisfied = Resolver().Implies(sources, target);
   ASSERT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, ContrapositionHalf) {
-  std::list<Rule::ptr> sources = {
-      Rule::createImplication(Rule::createAtom("A"), Rule::createAtom("B")),
+  std::list<Expr::ptr> sources = {
+      Expr::createImplication(Expr::createAtom("A"), Expr::createAtom("B")),
   };
-  Rule::ptr target =
-      Rule::createImplication(Rule::createInverse(Rule::createAtom("B")),
-                              Rule::createInverse(Rule::createAtom("A")));
+  Expr::ptr target =
+      Expr::createImplication(Expr::createInverse(Expr::createAtom("B")),
+                              Expr::createInverse(Expr::createAtom("A")));
 
   bool satisfied = Resolver().Implies(sources, target);
   ASSERT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, identity) {
-  Rule::ptr source = Rule::createTrue();
-  Rule::ptr target = Rule::createTrue();
+  Expr::ptr source = Expr::createTrue();
+  Expr::ptr target = Expr::createTrue();
 
   bool satisfied = Resolver().Implies(source, target);
   ASSERT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, reversedIdentity) {
-  Rule::ptr source = Rule::createTrue();
-  Rule::ptr target = Rule::createFalse();
+  Expr::ptr source = Expr::createTrue();
+  Expr::ptr target = Expr::createFalse();
 
   bool satisfied = Resolver().Implies(source, target);
   ASSERT_FALSE(satisfied);
 }
 
 TEST(ResolverTest, equality) {
-  Rule::ptr target = RuleParser().Parse("A = A");
+  Expr::ptr target = ExprParser().Parse("A = A");
 
-  bool satisfied = Resolver().Implies(Rule::createTrue(), target);
+  bool satisfied = Resolver().Implies(Expr::createTrue(), target);
   ASSERT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, predicatesSimple) {
-  std::list<Rule::ptr> axioms;
-  Rule::ptr target;
+  std::list<Expr::ptr> axioms;
+  Expr::ptr target;
 
   EXPECT_NO_THROW(
-      axioms.push_back(RuleParser().Parse("\\forall(x) (P(x) -> Q(x))")));
-  EXPECT_NO_THROW(axioms.push_back(RuleParser().Parse("P(A)")));
+      axioms.push_back(ExprParser().Parse("\\forall(x) (P(x) -> Q(x))")));
+  EXPECT_NO_THROW(axioms.push_back(ExprParser().Parse("P(A)")));
 
-  EXPECT_NO_THROW(target = RuleParser().Parse("Q(A)"));
+  EXPECT_NO_THROW(target = ExprParser().Parse("Q(A)"));
 
   bool satisfied = Resolver().Implies(axioms, target);
   ASSERT_TRUE(satisfied);
@@ -77,9 +77,9 @@ TEST(ResolverTest, scolemForm) {
    */
 
   GTEST_SKIP();
-  Rule::ptr target;
+  Expr::ptr target;
 
-  EXPECT_NO_THROW(target = RuleParser().Parse(
+  EXPECT_NO_THROW(target = ExprParser().Parse(
                       "\\forall(X) \\exists(Y) P(X, Y) & \\forall(X, Y) (P(X, "
                       "Y) -> ~P(Y, X)) & \\forall(X, Y, Z) (P(X, Y) -> (P(Y, "
                       "Z) -> P(X, Z)))"));
@@ -89,47 +89,81 @@ TEST(ResolverTest, scolemForm) {
 }
 
 TEST(ResolverTest, diffExists) {
-  std::list<Rule::ptr> axioms = {RuleParser().Parse("A -> \\exists(x) P(x)"),
-                                 RuleParser().Parse("\\exists(x) (Q(x) -> A)")};
-  Rule::ptr target = RuleParser().Parse("\\exists(x) (Q(x) -> P(x))");
+  std::list<Expr::ptr> axioms = {ExprParser().Parse("A -> \\exists(x) P(x)"),
+                                 ExprParser().Parse("\\exists(x) (Q(x) -> A)")};
+  Expr::ptr target = ExprParser().Parse("\\exists(x) (Q(x) -> P(x))");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_FALSE(satisfied);
 }
 
 TEST(ResolverTest, contrapositionPredicates) {
-  std::list<Rule::ptr> axioms = {
-      RuleParser().Parse("\\forall(x) (P(x) -> \\exists(y) Q(x, y))"),
-      RuleParser().Parse("~(\\exists(x) \\forall(y) Q(y, x))")};
-  Rule::ptr target = RuleParser().Parse("\\exists(x) ~P(x)");
+  std::list<Expr::ptr> axioms = {
+      ExprParser().Parse("\\forall(x) (P(x) -> \\exists(y) Q(x, y))"),
+      ExprParser().Parse("~(\\exists(x) \\forall(y) Q(y, x))")};
+  Expr::ptr target = ExprParser().Parse("\\exists(x) ~P(x)");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, transitivity) {
-  std::list<Rule::ptr> axioms = {
+  std::list<Expr::ptr> axioms = {
       // P(x, y) <=> x < y --- is transitive relation
-      RuleParser().Parse("\\forall(x, y, z) (P(x, z) & P(z, y) -> P(x, y))"),
+      ExprParser().Parse("\\forall(x, y, z) (P(x, z) & P(z, y) -> P(x, y))"),
       // some facts
-      RuleParser().Parse("P(3, 4) & P(4, 5) & P(5, 6)"),
+      ExprParser().Parse("P(3, 4) & P(4, 5) & P(5, 6)"),
   };
-  Rule::ptr target = RuleParser().Parse("P(3, 6)");
+  Expr::ptr target = ExprParser().Parse("P(3, 6)");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_TRUE(satisfied);
 }
 
 TEST(ResolverTest, lectionEx1) {
-  std::list<Rule::ptr> axioms = {
-      RuleParser().Parse("\\forall(x) (S(x) + M(x))"),
-      RuleParser().Parse("~(\\exists(x1) (M(x1) & L(x1, Rain)))"),
-      RuleParser().Parse("\\forall(x2) (S(x2) -> L(x2, Snow))"),
-      RuleParser().Parse("\\forall(y) (L(Lena, y) = ~L(Petya, y))"),
-      RuleParser().Parse("L(Petya, Rain)"),
-      RuleParser().Parse("L(Petya, Snow)"),
+  std::list<Expr::ptr> axioms = {
+      ExprParser().Parse("\\forall(x) (S(x) + M(x))"),
+      ExprParser().Parse("~(\\exists(x1) (M(x1) & L(x1, Rain)))"),
+      ExprParser().Parse("\\forall(x2) (S(x2) -> L(x2, Snow))"),
+      ExprParser().Parse("\\forall(y) (L(Lena, y) = ~L(Petya, y))"),
+      ExprParser().Parse("L(Petya, Rain)"),
+      ExprParser().Parse("L(Petya, Snow)"),
   };
-  Rule::ptr target = RuleParser().Parse("\\exists(x3) (M(x3) & ~S(x3))");
+  Expr::ptr target = ExprParser().Parse("\\exists(x3) (M(x3) & ~S(x3))");
+
+  bool satisfied = Resolver().Implies(axioms, target);
+  EXPECT_TRUE(satisfied);
+}
+
+TEST(ResolverTest, booleanLogic) {
+  // And(x, y, z) <=> x & y = z
+  // Or(x, y, z)  <=> x + y = z
+  std::list<Expr::ptr> axioms = {
+      ExprParser().Parse("\\forall(x) And(x, B0, B0) & And(x, B1, x)"),
+      ExprParser().Parse("\\forall(x) Or(x, B1, B1) & Or(x, B0, x)"),
+      ExprParser().Parse("\\forall(x, y, z) (And(x, y, z) = And(y, x, z))"),
+      ExprParser().Parse("\\forall(x, y, z) (Or(x, y, z) = Or(y, x, z))"),
+  };
+  // (1 & 0) + (0 + 1) = 1
+  // Or(a, b, 1)
+  // And(1, 0, a)
+  // Or(0, 1, b)
+  Expr::ptr target =
+      ExprParser().Parse("Or(a, b, B1) & And(B1, B0, a) & Or(B0, B1, b)");
+
+  bool satisfied = Resolver().Implies(axioms, target);
+  EXPECT_TRUE(satisfied);
+}
+
+TEST(ResolverTest, listLength) {
+  std::list<Expr::ptr> axioms = {
+      ExprParser().Parse(
+          "\\forall(y, z) (Len(y, z) -> \\forall(x) Len(Cons(x, y), succ(z)))"),
+      ExprParser().Parse("Len(Nil, 0)"),
+  };
+  // Len([A, B, C], succ(succ(succ(0))))
+  Expr::ptr target = ExprParser().Parse(
+      "Len(Cons(A, Cons(B, Cons(C, Nil))), succ(succ(succ(0))))");
 
   bool satisfied = Resolver().Implies(axioms, target);
   EXPECT_TRUE(satisfied);

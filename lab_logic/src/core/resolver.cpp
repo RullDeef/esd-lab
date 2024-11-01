@@ -1,33 +1,30 @@
 #include "resolver.h"
-#include "rule.h"
 #include "substitution.h"
 #include <algorithm>
-#include <cctype>
 #include <iostream>
-#include <iterator>
-#include <optional>
 #include <ostream>
 #include <string>
 
 struct DisjunctionComparator {
-  bool operator()(const Rule::ptr &left, const Rule::ptr &right) const {
+  bool operator()(const Expr::ptr &left, const Expr::ptr &right) const {
     int leftSize = left->getOperands().size();
     int rightSize = right->getOperands().size();
     return leftSize <= rightSize;
   }
 
-  bool operator()(const std::pair<Rule::ptr, Substitution> &left,
-                  const std::pair<Rule::ptr, Substitution> &right) const {
+  bool operator()(const std::pair<Expr::ptr, Substitution> &left,
+                  const std::pair<Expr::ptr, Substitution> &right) const {
     return this->operator()(left.first, right.first);
   }
 };
 
 static bool startsUpper(const std::string &value) {
-  return !value.empty() && std::isupper(value[0]);
+  return !value.empty() && std::isupper(value[0]) &&
+         !('0' <= value[0] && value[0] <= '9');
 }
 
 std::optional<Substitution>
-Resolver::unifyTerms(Rule::ptr left, Rule::ptr right, bool topLevel) {
+Resolver::unifyTerms(Expr::ptr left, Expr::ptr right, bool topLevel) {
   bool left_predicate = !left->getOperands().empty();
   bool left_var =
       !left_predicate && !startsUpper(left->getValue()) && !topLevel;
@@ -74,20 +71,20 @@ Resolver::unifyTerms(Rule::ptr left, Rule::ptr right, bool topLevel) {
   return std::nullopt;
 }
 
-std::optional<Substitution> Resolver::unifyInversePair(Rule::ptr left,
-                                                       Rule::ptr right) {
-  if (left->getType() == Rule::Type::inverse &&
-      right->getType() == Rule::Type::atom)
+std::optional<Substitution> Resolver::unifyInversePair(Expr::ptr left,
+                                                       Expr::ptr right) {
+  if (left->getType() == Expr::Type::inverse &&
+      right->getType() == Expr::Type::atom)
     return unifyInversePair(std::move(right), std::move(left));
-  if (left->getType() != Rule::Type::atom ||
-      right->getType() != Rule::Type::inverse)
+  if (left->getType() != Expr::Type::atom ||
+      right->getType() != Expr::Type::inverse)
     return std::nullopt;
   return unifyTerms(left, right->getOperands()[0]);
 }
 
-std::optional<std::pair<Rule::ptr, Substitution>>
-Resolver::tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
-                     const std::pair<Rule::ptr, Substitution> &disjunction2) {
+std::optional<std::pair<Expr::ptr, Substitution>>
+Resolver::tryResolve(const std::pair<Expr::ptr, Substitution> &disjunction1,
+                     const std::pair<Expr::ptr, Substitution> &disjunction2) {
   // cross apply substitutions
   Substitution sub1 = disjunction1.second;
   Substitution sub2 = disjunction2.second;
@@ -115,14 +112,14 @@ Resolver::tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
     atom = subst->applyTo(std::move(atom));
   *subst += sub1;
   *subst += sub2;
-  auto rule = std::make_shared<Rule>(Rule::Type::disjunction, disAtoms1);
+  auto rule = std::make_shared<Expr>(Expr::Type::disjunction, disAtoms1);
   return std::make_pair(rule, *subst);
 }
 
-bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
-  Rule::ptr sourceAnd;
+bool Resolver::Implies(std::list<Expr::ptr> source, Expr::ptr target) {
+  Expr::ptr sourceAnd;
   if (source.size() > 0)
-    sourceAnd = Rule::createConjunction(source.begin(), source.end());
+    sourceAnd = Expr::createConjunction(source.begin(), source.end());
   std::cout << "normal form: " << sourceAnd->toNormalForm()->toString()
             << std::endl;
   std::cout << "scolem form: " << sourceAnd->toScolemForm()->toString()
@@ -130,7 +127,7 @@ bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
   return Implies(sourceAnd, target);
 }
 
-bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
+bool Resolver::Implies(Expr::ptr source, Expr::ptr target) {
   if (target->toString() == "1")
     return true;
   if (target->toString() == "0")
@@ -140,13 +137,13 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   int replacementCounter = 0;
   if (source)
     source = source->toScolemForm(&replacementCounter);
-  target = Rule::createInverse(target)->toScolemForm(&replacementCounter);
+  target = Expr::createInverse(target)->toScolemForm(&replacementCounter);
 
   // выделить список элементарных дизъюнктов
   std::set<std::string> renamings;
   m_axiomSet =
       source ? disjunctionsTransform(source->getDisjunctionsList(), renamings)
-             : std::list<std::pair<Rule::ptr, Substitution>>{};
+             : std::list<std::pair<Expr::ptr, Substitution>>{};
   m_referenceSet =
       disjunctionsTransform(target->getDisjunctionsList(), renamings);
 
@@ -165,7 +162,7 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
     auto ref = m_referenceSet.front();
     m_referenceSet.pop_front();
 
-    std::list<std::pair<Rule::ptr, Substitution>>::iterator pair =
+    std::list<std::pair<Expr::ptr, Substitution>>::iterator pair =
         m_referenceSet.begin();
     while (pair != m_referenceSet.end()) {
       if (auto res = tryResolve(ref, *pair)) {
@@ -231,23 +228,12 @@ bool Resolver::Implies(Rule::ptr source, Rule::ptr target) {
   return false;
 }
 
-std::list<std::pair<Rule::ptr, Substitution>>
-Resolver::disjunctionsTransform(std::list<Rule::ptr> disjunctions,
+std::list<std::pair<Expr::ptr, Substitution>>
+Resolver::disjunctionsTransform(std::list<Expr::ptr> disjunctions,
                                 std::set<std::string> &renamings) {
-  std::list<std::pair<Rule::ptr, Substitution>> res;
-  for (auto &disjunction : disjunctions) {
-    // rename variables
-    // for (auto oldVar : disjunction->getFreeVars()) {
-    //   if (renamings.count(oldVar) == 0)
-    //     renamings.insert(oldVar);
-    //   else {
-    //     std::string newVar = "u" + std::to_string(renamings.size());
-    //     disjunction = disjunction->withRenamedVariable(oldVar, newVar);
-    //   }
-    // }
-    res.push_back(
-        std::make_pair<Rule::ptr, Substitution>(std::move(disjunction), {}));
-  }
+  std::list<std::pair<Expr::ptr, Substitution>> res;
+  for (auto &disjunction : disjunctions)
+    res.push_back(std::make_pair(std::move(disjunction), Substitution()));
   return res;
 }
 

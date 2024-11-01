@@ -1,101 +1,101 @@
-#include "rule.h"
+#include "expr.h"
+#include "utils.h"
 #include <algorithm>
 #include <cctype>
-#include <iterator>
+#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <string>
-#include <type_traits>
-#include <utility>
 
-bool contraryPair(const Rule &left, const Rule &right) {
-  if (left.type == Rule::Type::inverse && right.type == Rule::Type::atom)
+bool contraryPair(const Expr &left, const Expr &right) {
+  if (left.type == Expr::Type::inverse && right.type == Expr::Type::atom)
     return left.operands[0]->toString() == right.toString();
-  if (left.type == Rule::Type::atom && right.type == Rule::Type::inverse)
+  if (left.type == Expr::Type::atom && right.type == Expr::Type::inverse)
     return left.toString() == right.operands[0]->toString();
   return false;
 }
 
-Rule::ptr disjunctReduction(Rule::ptr rule) {
-  std::vector<Rule::ptr> terms = rule->getOperands();
+Expr::ptr disjunctReduction(Expr::ptr rule) {
+  std::vector<Expr::ptr> terms = rule->getOperands();
   for (int i = terms.size() - 1; i >= 0; --i) {
     for (int j = i - 1; j >= 0; --j) {
       if (terms[i]->toString() == terms[j]->toString()) {
         terms.erase(terms.begin() + i);
         break;
       } else if (contraryPair(*terms[i], *terms[j]))
-        return Rule::createTrue();
+        return Expr::createTrue();
     }
   }
-  return std::make_shared<Rule>(Rule::Type::disjunction, terms);
+  return std::make_shared<Expr>(Expr::Type::disjunction, terms);
 }
 
-Rule::Rule(std::string name, std::vector<ptr> operands)
+Expr::Expr(std::string name, std::vector<ptr> operands)
     : type(Type::atom), value(std::move(name)), operands(std::move(operands)) {}
 
-Rule::Rule(Type type, std::vector<ptr> operands, std::set<std::string> vars)
+Expr::Expr(Type type, std::vector<ptr> operands, std::set<std::string> vars)
     : type(type), vars(std::move(vars)), operands(std::move(operands)) {}
 
-Rule::Rule(std::true_type) : type(Type::constant), value("1") {}
+Expr::Expr(std::true_type) : type(Type::constant), value("1") {}
 
-Rule::Rule(std::false_type) : type(Type::constant), value("0") {}
+Expr::Expr(std::false_type) : type(Type::constant), value("0") {}
 
-Rule::ptr Rule::createTrue() {
-  return std::make_shared<Rule>(std::true_type{});
+Expr::ptr Expr::createTrue() {
+  return std::make_shared<Expr>(std::true_type{});
 }
 
-Rule::ptr Rule::createFalse() {
-  return std::make_shared<Rule>(std::false_type{});
+Expr::ptr Expr::createFalse() {
+  return std::make_shared<Expr>(std::false_type{});
 }
 
-Rule::ptr Rule::createAtom(std::string value) {
-  return std::make_shared<Rule>(std::move(value));
+Expr::ptr Expr::createAtom(std::string value) {
+  return std::make_shared<Expr>(std::move(value));
 }
 
-Rule::ptr Rule::createTerm(std::string func, std::vector<std::string> vars) {
+Expr::ptr Expr::createTerm(std::string func, std::vector<std::string> vars) {
   std::vector<ptr> operands;
   for (auto &var : vars)
     operands.push_back(createAtom(std::move(var)));
-  return std::make_shared<Rule>(std::move(func), std::move(operands));
+  return std::make_shared<Expr>(std::move(func), std::move(operands));
 }
 
-Rule::ptr Rule::createPredicate(std::string name, std::vector<ptr> operands) {
-  return std::make_shared<Rule>(std::move(name), std::move(operands));
+Expr::ptr Expr::createPredicate(std::string name, std::vector<ptr> operands) {
+  return std::make_shared<Expr>(std::move(name), std::move(operands));
 }
 
-Rule::ptr Rule::createInverse(Rule::ptr rule) {
-  return std::make_shared<Rule>(Type::inverse, std::vector{rule});
+Expr::ptr Expr::createInverse(Expr::ptr rule) {
+  return std::make_shared<Expr>(Type::inverse, std::vector{rule});
 }
 
-Rule::ptr Rule::createConjunction(Rule::ptr left, Rule::ptr right) {
-  return std::make_shared<Rule>(Type::conjunction, std::vector{left, right});
+Expr::ptr Expr::createConjunction(Expr::ptr left, Expr::ptr right) {
+  return std::make_shared<Expr>(Type::conjunction, std::vector{left, right});
 }
 
-Rule::ptr Rule::createDisjunction(Rule::ptr left, Rule::ptr right) {
-  return std::make_shared<Rule>(Type::disjunction, std::vector{left, right});
+Expr::ptr Expr::createDisjunction(Expr::ptr left, Expr::ptr right) {
+  return std::make_shared<Expr>(Type::disjunction, std::vector{left, right});
 }
 
-Rule::ptr Rule::createImplication(Rule::ptr from, Rule::ptr to) {
+Expr::ptr Expr::createImplication(Expr::ptr from, Expr::ptr to) {
   return createDisjunction(createInverse(from), to);
 }
 
-Rule::ptr Rule::createEquality(ptr left, ptr right) {
+Expr::ptr Expr::createEquality(ptr left, ptr right) {
   return createConjunction(createImplication(left, right),
                            createImplication(right, left));
 }
 
-Rule::ptr Rule::createExists(std::set<std::string> vars, Rule::ptr rule) {
-  return std::make_shared<Rule>(Type::exists, std::vector{rule},
+Expr::ptr Expr::createExists(std::set<std::string> vars, Expr::ptr rule) {
+  return std::make_shared<Expr>(Type::exists, std::vector{rule},
                                 std::move(vars));
 }
 
-Rule::ptr Rule::createForAll(std::set<std::string> vars, Rule::ptr rule) {
-  return std::make_shared<Rule>(Type::forall, std::vector{rule},
+Expr::ptr Expr::createForAll(std::set<std::string> vars, Expr::ptr rule) {
+  return std::make_shared<Expr>(Type::forall, std::vector{rule},
                                 std::move(vars));
 }
 
-bool Rule::operator==(const Rule &other) const {
+bool Expr::operator==(const Expr &other) const {
   if (this == &other)
     return true;
   if (type == Type::atom || other.type == Type::atom) {
@@ -118,15 +118,15 @@ bool Rule::operator==(const Rule &other) const {
   return opEqual;
 }
 
-bool Rule::operator!=(const Rule &other) const { return !(*this == other); }
+bool Expr::operator!=(const Expr &other) const { return !(*this == other); }
 
-bool Rule::operator==(const std::string &val) const {
+bool Expr::operator==(const std::string &val) const {
   return toString() == val;
 }
 
-bool Rule::operator!=(const std::string &val) const { return !(*this == val); }
+bool Expr::operator!=(const std::string &val) const { return !(*this == val); }
 
-std::string Rule::toString() const {
+std::string Expr::toString() const {
   std::string res = "";
   bool first = true;
   switch (type) {
@@ -194,18 +194,19 @@ std::string Rule::toString() const {
   return res;
 }
 
-std::list<Rule::ptr> Rule::getDisjunctionsList() const {
+std::list<Expr::ptr> Expr::getDisjunctionsList() const {
   return std::list<ptr>(operands.begin(), operands.end());
 }
 
-std::set<std::string> Rule::getFreeVars() const {
+std::set<std::string> Expr::getFreeVars() const {
   std::set<std::string> res;
   if (type == Type::constant) {
     // res = {};
   } else if (type == Type::atom && !operands.empty()) {
     // recursion base case
     for (auto operand : operands) {
-      if (operand->operands.empty() && !std::isupper(operand->value[0]))
+      if (operand->operands.empty() && !std::isupper(operand->value[0]) &&
+          !('0' <= operand->value[0] && operand->value[0] <= '9'))
         res.insert(operand->value);
       else {
         auto inner = operand->getFreeVars();
@@ -225,7 +226,7 @@ std::set<std::string> Rule::getFreeVars() const {
   return res;
 }
 
-Rule::ptr Rule::withRenamedVariable(const std::string &oldName,
+Expr::ptr Expr::withRenamedVariable(const std::string &oldName,
                                     const std::string &newName) {
   std::vector<ptr> newOperands;
   std::set<std::string> newVars;
@@ -250,7 +251,7 @@ Rule::ptr Rule::withRenamedVariable(const std::string &oldName,
   case Type::disjunction:
     for (auto &op : operands)
       newOperands.push_back(op->withRenamedVariable(oldName, newName));
-    return std::make_shared<Rule>(type, std::move(newOperands));
+    return std::make_shared<Expr>(type, std::move(newOperands));
   case Type::exists:
   case Type::forall:
     newVars = vars;
@@ -261,11 +262,11 @@ Rule::ptr Rule::withRenamedVariable(const std::string &oldName,
     }
     for (auto &op : operands)
       newOperands.push_back(op->withRenamedVariable(oldName, newName));
-    return std::make_shared<Rule>(type, std::move(newOperands), newVars);
+    return std::make_shared<Expr>(type, std::move(newOperands), newVars);
   }
 }
 
-Rule::ptr Rule::withReplacedVariable(const std::string &varName, ptr term) {
+Expr::ptr Expr::withReplacedVariable(const std::string &varName, ptr term) {
   std::vector<ptr> newOperands;
   switch (type) {
   case Type::constant:
@@ -288,7 +289,7 @@ Rule::ptr Rule::withReplacedVariable(const std::string &varName, ptr term) {
   case Type::disjunction:
     for (auto &op : operands)
       newOperands.push_back(op->withReplacedVariable(varName, term));
-    return std::make_shared<Rule>(type, std::move(newOperands));
+    return std::make_shared<Expr>(type, std::move(newOperands));
   case Type::exists:
   case Type::forall:
     if (vars.count(varName) == 0) {
@@ -297,20 +298,20 @@ Rule::ptr Rule::withReplacedVariable(const std::string &varName, ptr term) {
     } else {
       newOperands = operands;
     }
-    return std::make_shared<Rule>(type, std::move(newOperands), vars);
+    return std::make_shared<Expr>(type, std::move(newOperands), vars);
   }
 }
 
-Rule::ptr Rule::toNormalForm() {
+Expr::ptr Expr::toNormalForm() {
   if (isCNF)
     return shared_from_this();
   switch (type) {
   case Type::constant:
     return shared_from_this();
   case Type::atom:
-    return std::make_shared<Rule>(
+    return std::make_shared<Expr>(
         Type::conjunction,
-        std::vector{std::make_shared<Rule>(Type::disjunction,
+        std::vector{std::make_shared<Expr>(Type::disjunction,
                                            std::vector{shared_from_this()})});
   case Type::inverse:
     return inverseToNormalForm();
@@ -324,7 +325,7 @@ Rule::ptr Rule::toNormalForm() {
   }
 }
 
-Rule::ptr Rule::inverseToNormalForm() {
+Expr::ptr Expr::inverseToNormalForm() {
   switch (operands[0]->type) {
   case Type::constant:
     if (operands[0]->value == "1")
@@ -332,9 +333,9 @@ Rule::ptr Rule::inverseToNormalForm() {
     else
       return createTrue();
   case Type::atom:
-    return std::make_shared<Rule>(
+    return std::make_shared<Expr>(
         Type::conjunction,
-        std::vector{std::make_shared<Rule>(Type::disjunction,
+        std::vector{std::make_shared<Expr>(Type::disjunction,
                                            std::vector{shared_from_this()})});
   case Type::inverse:
     return operands[0]->operands[0]->toNormalForm();
@@ -357,7 +358,7 @@ Rule::ptr Rule::inverseToNormalForm() {
   }
 }
 
-Rule::ptr Rule::conjunctionToNormalForm() {
+Expr::ptr Expr::conjunctionToNormalForm() {
   auto left = operands[0]->toNormalForm();
   auto right = operands[1]->toNormalForm();
 
@@ -380,7 +381,7 @@ Rule::ptr Rule::conjunctionToNormalForm() {
                  return std::all_of(disjunctions.begin(), disjunctions.end(),
                                     [&x](auto d) { return *x != *d; });
                });
-  ptr res = std::make_shared<Rule>(Type::conjunction, disjunctions);
+  ptr res = std::make_shared<Expr>(Type::conjunction, disjunctions);
 
   // apply quantifiers if any
   for (int i = quantifiers.size() - 1; i >= 0; --i) {
@@ -393,7 +394,7 @@ Rule::ptr Rule::conjunctionToNormalForm() {
   return res;
 }
 
-Rule::ptr Rule::disjunctionToNormalForm() {
+Expr::ptr Expr::disjunctionToNormalForm() {
   auto left = operands[0]->toNormalForm();
   auto right = operands[1]->toNormalForm();
 
@@ -419,9 +420,9 @@ Rule::ptr Rule::disjunctionToNormalForm() {
                    std::back_inserter(args), [&args](auto x) {
                      return std::all_of(
                          args.begin(), args.end(),
-                         [&x](const Rule::ptr &d) { return *x != *d; });
+                         [&x](const Expr::ptr &d) { return *x != *d; });
                    });
-      auto newRule = std::make_shared<Rule>(Type::disjunction, args);
+      auto newRule = std::make_shared<Expr>(Type::disjunction, args);
       if (std::all_of(disjunctions.begin(), disjunctions.end(),
                       [&newRule](auto d) { return *d != *newRule; }))
         disjunctions.push_back(newRule);
@@ -437,7 +438,7 @@ Rule::ptr Rule::disjunctionToNormalForm() {
   if (disjunctions.empty())
     return createTrue();
 
-  auto res = std::make_shared<Rule>(Type::conjunction, disjunctions);
+  auto res = std::make_shared<Expr>(Type::conjunction, disjunctions);
 
   // apply quantifiers if any
   for (int i = quantifiers.size() - 1; i >= 0; --i) {
@@ -450,7 +451,7 @@ Rule::ptr Rule::disjunctionToNormalForm() {
   return res;
 }
 
-Rule::ptr Rule::quantifierToNormalForm() {
+Expr::ptr Expr::quantifierToNormalForm() {
   auto rule = operands[0]->toNormalForm();
   auto ruleVars = rule->getFreeVars();
   std::set<std::string> newVars;
@@ -459,10 +460,10 @@ Rule::ptr Rule::quantifierToNormalForm() {
       newVars.insert(var);
   if (newVars.empty())
     return rule;
-  return std::make_shared<Rule>(type, std::vector{rule}, newVars);
+  return std::make_shared<Expr>(type, std::vector{rule}, newVars);
 }
 
-Rule::ptr Rule::toScolemForm(int *replacementCounter) {
+Expr::ptr Expr::toScolemForm(int *replacementCounter) {
   auto rule = toNormalForm();
 
   int replacementCounterLocal = 0; // f0(...), f1(...), ....
@@ -487,7 +488,7 @@ Rule::ptr Rule::toScolemForm(int *replacementCounter) {
   return rule;
 }
 
-Rule::ptr Rule::extractFrontQuantifiers(
+Expr::ptr Expr::extractFrontQuantifiers(
     std::map<std::string, std::string> &renamings,
     std::vector<std::pair<Type, std::set<std::string>>> &quantifiers,
     ptr rule) {
@@ -508,7 +509,9 @@ Rule::ptr Rule::extractFrontQuantifiers(
           renamings[var] = var;
           newVars.insert(var);
         } else {
-          auto newName = var + std::to_string(count);
+          auto newName = nextIndexed(var);
+          while (renamings.count(newName) > 0 && rule->vars.count(newName) > 0)
+            newName = nextIndexed(newName);
           renamings[newName] = var;
           rule->operands[0] =
               rule->operands[0]->withRenamedVariable(var, newName);

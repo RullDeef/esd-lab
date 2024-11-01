@@ -1,15 +1,15 @@
-#include "rule.h"
-#include "rule_parser.h"
+#include "expr.h"
+#include "expr_parser.h"
 #include <gtest/gtest.h>
 
 using namespace std::string_literals;
 
-TEST(RuleTests, printer) {
-  auto rule = Rule::createDisjunction(
-      Rule::createConjunction(Rule::createAtom("A"),
-                              Rule::createInverse(Rule::createAtom("B"))),
-      Rule::createDisjunction(Rule::createInverse(Rule::createAtom("C")),
-                              Rule::createAtom("D")));
+TEST(ExprTests, printer) {
+  auto rule = Expr::createDisjunction(
+      Expr::createConjunction(Expr::createAtom("A"),
+                              Expr::createInverse(Expr::createAtom("B"))),
+      Expr::createDisjunction(Expr::createInverse(Expr::createAtom("C")),
+                              Expr::createAtom("D")));
 
   auto expected = "(A & ~B) + (~C + D)"s;
   auto actual = rule->toString();
@@ -17,8 +17,8 @@ TEST(RuleTests, printer) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfSimple) {
-  auto rule = Rule::createInverse(Rule::createInverse(Rule::createAtom("A")));
+TEST(ExprTests, cnfSimple) {
+  auto rule = Expr::createInverse(Expr::createInverse(Expr::createAtom("A")));
 
   auto cnf = rule->toNormalForm();
   ASSERT_NE(cnf, nullptr);
@@ -29,11 +29,11 @@ TEST(RuleTests, cnfSimple) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfConjunctions) {
+TEST(ExprTests, cnfConjunctions) {
   // (A & D) & (B & C)
-  auto rule = Rule::createConjunction(
-      Rule::createConjunction(Rule::createAtom("A"), Rule::createAtom("D")),
-      Rule::createConjunction(Rule::createAtom("B"), Rule::createAtom("C")));
+  auto rule = Expr::createConjunction(
+      Expr::createConjunction(Expr::createAtom("A"), Expr::createAtom("D")),
+      Expr::createConjunction(Expr::createAtom("B"), Expr::createAtom("C")));
 
   auto cnf = rule->toNormalForm();
 
@@ -43,11 +43,11 @@ TEST(RuleTests, cnfConjunctions) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfDisjunctions) {
+TEST(ExprTests, cnfDisjunctions) {
   // (A + D) + (B + C)
-  auto rule = Rule::createDisjunction(
-      Rule::createDisjunction(Rule::createAtom("A"), Rule::createAtom("D")),
-      Rule::createDisjunction(Rule::createAtom("B"), Rule::createAtom("C")));
+  auto rule = Expr::createDisjunction(
+      Expr::createDisjunction(Expr::createAtom("A"), Expr::createAtom("D")),
+      Expr::createDisjunction(Expr::createAtom("B"), Expr::createAtom("C")));
 
   auto cnf = rule->toNormalForm();
 
@@ -57,12 +57,12 @@ TEST(RuleTests, cnfDisjunctions) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfMedium) {
+TEST(ExprTests, cnfMedium) {
   // (~A & B) + A
-  auto ruleA = Rule::createAtom("A");
-  auto ruleB = Rule::createAtom("B");
-  auto rule = Rule::createDisjunction(
-      Rule::createConjunction(Rule::createInverse(ruleA), ruleB), ruleA);
+  auto ruleA = Expr::createAtom("A");
+  auto ruleB = Expr::createAtom("B");
+  auto rule = Expr::createDisjunction(
+      Expr::createConjunction(Expr::createInverse(ruleA), ruleB), ruleA);
 
   EXPECT_EQ("(~A & B) + A"s, rule->toString());
 
@@ -74,9 +74,9 @@ TEST(RuleTests, cnfMedium) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfEquality) {
+TEST(ExprTests, cnfEquality) {
   auto rule =
-      Rule::createEquality(Rule::createAtom("A"), Rule::createAtom("B"));
+      Expr::createEquality(Expr::createAtom("A"), Expr::createAtom("B"));
 
   EXPECT_EQ("(~A + B) & (~B + A)", rule->toString());
 
@@ -88,15 +88,15 @@ TEST(RuleTests, cnfEquality) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfHard) {
+TEST(ExprTests, cnfHard) {
   // ((A -> B) & A) -> B
   // ~((~A + B) & A) + B
   // (A & ~B) + ~A + B
   // (A + ~A + B) & (~B + ~A + B)
-  auto ruleA = Rule::createAtom("A");
-  auto ruleB = Rule::createAtom("B");
-  auto rule = Rule::createImplication(
-      Rule::createConjunction(Rule::createImplication(ruleA, ruleB), ruleA),
+  auto ruleA = Expr::createAtom("A");
+  auto ruleB = Expr::createAtom("B");
+  auto rule = Expr::createImplication(
+      Expr::createConjunction(Expr::createImplication(ruleA, ruleB), ruleA),
       ruleB);
 
   EXPECT_EQ("~((~A + B) & A) + B"s, rule->toString());
@@ -109,15 +109,15 @@ TEST(RuleTests, cnfHard) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, cnfVeryHard) {
+TEST(ExprTests, cnfVeryHard) {
   // contraposition rule:
   // (A -> B) <-> (~B -> ~A)
-  auto ruleA = Rule::createAtom("A");
-  auto ruleB = Rule::createAtom("B");
+  auto ruleA = Expr::createAtom("A");
+  auto ruleB = Expr::createAtom("B");
   auto rule =
-      Rule::createEquality(Rule::createImplication(ruleA, ruleB),
-                           Rule::createImplication(Rule::createInverse(ruleB),
-                                                   Rule::createInverse(ruleA)));
+      Expr::createEquality(Expr::createImplication(ruleA, ruleB),
+                           Expr::createImplication(Expr::createInverse(ruleB),
+                                                   Expr::createInverse(ruleA)));
 
   auto cnf = rule->toNormalForm();
 
@@ -128,10 +128,10 @@ TEST(RuleTests, cnfVeryHard) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, identityReduction) {
+TEST(ExprTests, identityReduction) {
   // ~(A <-> B)
-  auto rule = Rule::createInverse(
-      Rule::createEquality(Rule::createAtom("A"), Rule::createAtom("B")));
+  auto rule = Expr::createInverse(
+      Expr::createEquality(Expr::createAtom("A"), Expr::createAtom("B")));
 
   auto cnf = rule->toNormalForm();
   auto expected = "(A + B) & (~B + ~A)";
@@ -140,11 +140,11 @@ TEST(RuleTests, identityReduction) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, predicateNormalization) {
+TEST(ExprTests, predicateNormalization) {
   auto text = "P(X) + Q(Y) & R(Z, g(X))";
-  Rule::ptr rule;
+  Expr::ptr rule;
 
-  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+  EXPECT_NO_THROW(rule = ExprParser().Parse(text));
 
   rule = rule->toNormalForm();
 
@@ -154,11 +154,11 @@ TEST(RuleTests, predicateNormalization) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, differentPredicates) {
+TEST(ExprTests, differentPredicates) {
   auto text = "P(X) + P(Y)";
-  Rule::ptr rule;
+  Expr::ptr rule;
 
-  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+  EXPECT_NO_THROW(rule = ExprParser().Parse(text));
 
   rule = rule->toNormalForm();
 
@@ -168,11 +168,11 @@ TEST(RuleTests, differentPredicates) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, simpleQuantifiers) {
+TEST(ExprTests, simpleQuantifiers) {
   auto text = "P(X) & \\forall(y) R(y) + \\exists (y) Q(y, Z)";
-  Rule::ptr rule;
+  Expr::ptr rule;
 
-  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+  EXPECT_NO_THROW(rule = ExprParser().Parse(text));
 
   rule = rule->toNormalForm();
 
@@ -183,11 +183,11 @@ TEST(RuleTests, simpleQuantifiers) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, redundantVars) {
+TEST(ExprTests, redundantVars) {
   auto text = "\\forall(x, y, z) (P(x) + \\forall(z, w) Q(y))";
-  Rule::ptr rule;
+  Expr::ptr rule;
 
-  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+  EXPECT_NO_THROW(rule = ExprParser().Parse(text));
 
   rule = rule->toNormalForm();
 
@@ -197,11 +197,11 @@ TEST(RuleTests, redundantVars) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, transitivity) {
+TEST(ExprTests, transitivity) {
   auto text = "(gt(X, Y) & gt(Y, Z)) -> gt(X, Z)";
-  Rule::ptr rule;
+  Expr::ptr rule;
 
-  EXPECT_NO_THROW(rule = RuleParser().Parse(text));
+  EXPECT_NO_THROW(rule = ExprParser().Parse(text));
 
   rule = rule->toNormalForm();
 
@@ -211,9 +211,9 @@ TEST(RuleTests, transitivity) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(RuleTests, toNormalIdempotent) {
+TEST(ExprTests, toNormalIdempotent) {
   auto rule =
-      RuleParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
+      ExprParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
 
   auto ruleBefore = rule->toString();
   rule->toNormalForm();
@@ -223,9 +223,9 @@ TEST(RuleTests, toNormalIdempotent) {
   EXPECT_EQ(ruleBefore, ruleAfter);
 }
 
-TEST(RuleTests, toScolemForm) {
+TEST(ExprTests, toScolemForm) {
   auto rule =
-      RuleParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
+      ExprParser().Parse("(~A + \\exists(x) P(x)) & \\exists(x) (~Q(x) + A)");
 
   auto ruleBefore = rule->toString();
   rule->toScolemForm();
