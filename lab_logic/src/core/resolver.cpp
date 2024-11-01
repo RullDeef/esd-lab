@@ -90,20 +90,20 @@ tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
   Substitution sub1 = disjunction1.second;
   Substitution sub2 = disjunction2.second;
 
-  std::cout << "disj1: " << disjunction1.first->toString() << std::endl;
-  std::cout << "disj2: " << disjunction2.first->toString() << std::endl;
-  std::cout << "sub1: " << sub1.toString() << std::endl;
-  std::cout << "sub2: " << sub2.toString() << std::endl;
+  // std::cout << "disj1: " << disjunction1.first->toString() << std::endl;
+  // std::cout << "disj2: " << disjunction2.first->toString() << std::endl;
+  // std::cout << "sub1: " << sub1.toString() << std::endl;
+  // std::cout << "sub2: " << sub2.toString() << std::endl;
   auto disAtoms1 = sub2.applyTo(disjunction1.first)->getOperands();
   auto disAtoms2 = sub1.applyTo(disjunction2.first)->getOperands();
-  std::cout << "dis1*: ";
-  for (auto &atom : disAtoms1)
-    std::cout << atom->toString() << ", ";
-  std::cout << std::endl;
-  std::cout << "dis2*: ";
-  for (auto &atom : disAtoms2)
-    std::cout << atom->toString() << ", ";
-  std::cout << std::endl;
+  // std::cout << "dis1*: ";
+  // for (auto &atom : disAtoms1)
+  //   std::cout << atom->toString() << ", ";
+  // std::cout << std::endl;
+  // std::cout << "dis2*: ";
+  // for (auto &atom : disAtoms2)
+  //   std::cout << atom->toString() << ", ";
+  // std::cout << std::endl;
 
   std::optional<Substitution> subst;
   for (int i = 0; i < disAtoms1.size(); ++i) {
@@ -134,10 +134,10 @@ bool Resolver::Implies(std::list<Rule::ptr> source, Rule::ptr target) {
   Rule::ptr sourceAnd;
   if (source.size() > 0)
     sourceAnd = Rule::createConjunction(source.begin(), source.end());
-  std::cout << "conjunction res: " << sourceAnd->toString() << std::endl;
-  // std::cout << "normal form: " << sourceAnd->toNormalForm()->toString()
-  // << std::endl;
-  std::cout << "sknf: " << sourceAnd->toScolemForm()->toString() << std::endl;
+  std::cout << "normal form: " << sourceAnd->toNormalForm()->toString()
+            << std::endl;
+  std::cout << "scolem form: " << sourceAnd->toScolemForm()->toString()
+            << std::endl;
   return Implies(sourceAnd, target);
 }
 

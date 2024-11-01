@@ -124,7 +124,7 @@ TEST(ResolverTest, lectionEx1) {
   std::list<Rule::ptr> axioms = {
       RuleParser().Parse("\\forall(x) (S(x) + M(x))"),
       RuleParser().Parse("~(\\exists(x1) (M(x1) & L(x1, Rain)))"),
-      RuleParser().Parse("\\forall(x2) L(x2, Snow)"),
+      RuleParser().Parse("\\forall(x2) (S(x2) -> L(x2, Snow))"),
       RuleParser().Parse("\\forall(y) (L(Lena, y) = ~L(Petya, y))"),
       RuleParser().Parse("L(Petya, Rain)"),
       RuleParser().Parse("L(Petya, Snow)"),
@@ -132,5 +132,5 @@ TEST(ResolverTest, lectionEx1) {
   Rule::ptr target = RuleParser().Parse("\\exists(x3) (M(x3) & ~S(x3))");
 
   bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_FALSE(satisfied);
+  EXPECT_TRUE(satisfied);
 }
