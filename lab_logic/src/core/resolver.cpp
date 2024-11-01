@@ -26,26 +26,26 @@ static bool startsUpper(const std::string &value) {
   return !value.empty() && std::isupper(value[0]);
 }
 
-static std::optional<Substitution> unifyTerms(Rule::ptr left, Rule::ptr right,
-                                              bool topLevel = true) {
+std::optional<Substitution>
+Resolver::unifyTerms(Rule::ptr left, Rule::ptr right, bool topLevel) {
   bool left_predicate = !left->getOperands().empty();
   bool left_var =
       !left_predicate && !startsUpper(left->getValue()) && !topLevel;
-  bool left_atom = !left_predicate && !left_var;
+  bool left_const = !left_predicate && !left_var;
   bool right_predicate = !right->getOperands().empty();
   bool right_var =
       !right_predicate && !startsUpper(right->getValue()) && !topLevel;
-  bool right_atom = !right_predicate && !right_var;
+  bool right_const = !right_predicate && !right_var;
 
-  if (left_atom && right_atom) {
+  if (left_const && right_const) {
     return left->getValue() == right->getValue()
                ? std::make_optional<Substitution>()
                : std::nullopt;
-  } else if ((left_atom || left_predicate) && right_var) {
+  } else if ((left_const || left_predicate) && right_var) {
     Substitution subst;
     subst.add(right->getValue(), left);
     return std::move(subst);
-  } else if ((right_atom || right_predicate) && left_var) {
+  } else if ((right_const || right_predicate) && left_var) {
     Substitution subst;
     subst.add(left->getValue(), right);
     return std::move(subst);
@@ -61,6 +61,8 @@ static std::optional<Substitution> unifyTerms(Rule::ptr left, Rule::ptr right,
       auto part = unifyTerms(leftOperands[i], rightOperands[i], false);
       if (!part)
         return std::nullopt;
+      if (subst.conflicts(*part))
+        return std::nullopt;
       subst += *part;
     }
     return std::move(subst);
@@ -72,8 +74,8 @@ static std::optional<Substitution> unifyTerms(Rule::ptr left, Rule::ptr right,
   return std::nullopt;
 }
 
-static std::optional<Substitution> unifyInversePair(Rule::ptr left,
-                                                    Rule::ptr right) {
+std::optional<Substitution> Resolver::unifyInversePair(Rule::ptr left,
+                                                       Rule::ptr right) {
   if (left->getType() == Rule::Type::inverse &&
       right->getType() == Rule::Type::atom)
     return unifyInversePair(std::move(right), std::move(left));
@@ -83,27 +85,14 @@ static std::optional<Substitution> unifyInversePair(Rule::ptr left,
   return unifyTerms(left, right->getOperands()[0]);
 }
 
-static std::optional<std::pair<Rule::ptr, Substitution>>
-tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
-           const std::pair<Rule::ptr, Substitution> &disjunction2) {
+std::optional<std::pair<Rule::ptr, Substitution>>
+Resolver::tryResolve(const std::pair<Rule::ptr, Substitution> &disjunction1,
+                     const std::pair<Rule::ptr, Substitution> &disjunction2) {
   // cross apply substitutions
   Substitution sub1 = disjunction1.second;
   Substitution sub2 = disjunction2.second;
-
-  // std::cout << "disj1: " << disjunction1.first->toString() << std::endl;
-  // std::cout << "disj2: " << disjunction2.first->toString() << std::endl;
-  // std::cout << "sub1: " << sub1.toString() << std::endl;
-  // std::cout << "sub2: " << sub2.toString() << std::endl;
   auto disAtoms1 = sub2.applyTo(disjunction1.first)->getOperands();
   auto disAtoms2 = sub1.applyTo(disjunction2.first)->getOperands();
-  // std::cout << "dis1*: ";
-  // for (auto &atom : disAtoms1)
-  //   std::cout << atom->toString() << ", ";
-  // std::cout << std::endl;
-  // std::cout << "dis2*: ";
-  // for (auto &atom : disAtoms2)
-  //   std::cout << atom->toString() << ", ";
-  // std::cout << std::endl;
 
   std::optional<Substitution> subst;
   for (int i = 0; i < disAtoms1.size(); ++i) {

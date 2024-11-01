@@ -22,6 +22,8 @@ public:
 
   std::string toString() const;
 
+  bool conflicts(const Substitution& other);
+
 private:
   std::map<std::string, Rule::ptr> pairs;
 };

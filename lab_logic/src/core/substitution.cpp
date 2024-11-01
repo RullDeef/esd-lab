@@ -73,3 +73,10 @@ std::string Substitution::toString() const {
   res += "}";
   return res;
 }
+
+bool Substitution::conflicts(const Substitution& other) {
+  for (auto [var, value] : other.pairs)
+    if (has(var) && *get(var) != *value)
+      return true;
+  return false;
+}
