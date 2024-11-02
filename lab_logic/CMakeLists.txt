@@ -16,7 +16,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-file(GLOB CORE_SOURCES src/core/*.cpp)
+file(GLOB CORE_SOURCES src/core/*.cpp src/core/parser/*.cpp)
 file(GLOB APP_SOURCES src/app/*.cpp)
 file(GLOB TEST_SOURCES tests/*.cpp)
 

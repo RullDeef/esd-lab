@@ -1,4 +1,4 @@
-#include "expr_parser.h"
+#include "parser/expr_parser.h"
 #include <gtest/gtest.h>
 
 TEST(ParserTest, SimpleCase) {

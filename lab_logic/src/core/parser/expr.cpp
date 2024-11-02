@@ -1,12 +1,10 @@
 #include "expr.h"
-#include "utils.h"
+#include "../utils.h"
 #include <algorithm>
 #include <cctype>
-#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
-#include <ostream>
 #include <string>
 
 bool contraryPair(const Expr &left, const Expr &right) {
