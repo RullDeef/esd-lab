@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <execution>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <list>
 #include <map>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <set>
 #include <string>
 #include <vector>
@@ -425,7 +427,7 @@ public:
       return term;
     auto name = term->getValue();
     std::vector<Variable::ptr> args;
-    for (const auto &arg : term->getArguments())
+    for (auto arg : term->getArguments())
       args.push_back(apply(arg));
     return std::make_shared<Variable>(false, std::move(name), std::move(args));
   }
@@ -607,99 +609,97 @@ public:
 
   std::optional<ExtendedDisjunct> resolve(const ExtendedDisjunct &left,
                                           const ExtendedDisjunct &right,
-                                          int &nextID) {
+                                          int nextID) {
     for (int i = 0; i < left.disjunct.size(); ++i) {
       for (int j = 0; j < right.disjunct.size(); ++j) {
         if (auto subst = unify(left.disjunct[i], right.disjunct[j])) {
           auto disj = subst->apply(left.disjunct.withoutNth(i) +
                                    right.disjunct.withoutNth(j));
-          return ExtendedDisjunct{nextID++, disj, *subst, {left.id, right.id}};
+          return ExtendedDisjunct{nextID, disj, *subst, {left.id, right.id}};
         }
       }
     }
     return std::nullopt;
   }
 
-  std::optional<Subst> resolve(std::list<ExtendedDisjunct> axioms,
-                               std::list<ExtendedDisjunct> target, int nextID) {
-    std::set<std::pair<int, int>> pairsTested;
-
-    NameAllocator allocator;
-    bool first = true;
-    for (auto &axiom : axioms) {
-      if (first)
-        axiom.disjunct.commitVarNames(allocator);
-      else
-        axiom.disjunct = axiom.disjunct.renamedFreeVars(allocator);
+  template <typename T>
+  void populateIndexes(const std::vector<ExtendedDisjunct> &disjuncts, T &set,
+                       int index = -1) {
+    if (index == -1)
+      index = disjuncts.size() - 1;
+    set.insert(index);
+    if (disjuncts[index].parent_id[0] != -1) {
+      populateIndexes(disjuncts, set, disjuncts[index].parent_id[0]);
+      populateIndexes(disjuncts, set, disjuncts[index].parent_id[1]);
     }
-    for (auto &tar : target)
-      tar.disjunct = tar.disjunct.renamedFreeVars(allocator);
+  }
 
-    bool wasNew = true;
-    while (wasNew) {
-      wasNew = false;
+  void printResolutionChain(const std::vector<ExtendedDisjunct> &disjuncts) {
+    std::set<int> indexSet;
+    populateIndexes(disjuncts, indexSet);
+    std::priority_queue<int, std::vector<int>, std::greater<int>> indexQueue;
+    for (auto index : indexSet)
+      indexQueue.push(index);
 
-      auto refIter = target.begin();
-      while (refIter != target.end()) {
-        auto pairIter = target.begin();
-        std::advance(pairIter, 1);
-        while (pairIter != target.end()) {
-          if (pairsTested.count({refIter->id, pairIter->id})) {
-            pairIter++;
-            continue;
-          }
-          auto res = resolve(*refIter, *pairIter, nextID);
-          if (!res) {
-            pairIter++;
-            continue;
-          }
-          std::cout << "resolved with refset:\n";
-          std::cout << "d1:  " << refIter->disjunct.toString() << "\n";
-          std::cout << "d2:  " << pairIter->disjunct.toString() << "\n";
-          std::cout << "res: " << res->disjunct.toString() << "\n";
-          std::cout << "subst: " << res->subst.toString() << "\n";
-          if (res->disjunct.size() == 0)
-            return res->subst;
-          pairsTested.insert({refIter->id, pairIter->id});
-          pairsTested.insert({pairIter->id, refIter->id});
-          target.push_back(*res);
-          wasNew = true;
+    std::map<int, int> renum;
+    for (int index = indexQueue.top(); !indexQueue.empty();
+         indexQueue.pop(), index = indexQueue.top()) {
+      int num = renum.size() + 1;
+      renum[index] = num;
+      if (disjuncts[index].parent_id[0] == -1) {
+        // axiom, used
+        std::cout << num << ") " << disjuncts[index].disjunct.toString()
+                  << std::endl;
+      } else {
+        std::cout << num << ") " << disjuncts[index].disjunct.toString() << " ("
+                  << renum[disjuncts[index].parent_id[0]] << " + "
+                  << renum[disjuncts[index].parent_id[1]] << ") "
+                  << disjuncts[index].subst.toString() << "\n";
+      }
+    }
+  }
+
+  std::optional<Subst> resolve(std::list<ExtendedDisjunct> axioms,
+                               std::list<ExtendedDisjunct> target) {
+    // combine all disjuncts in single vector
+    std::vector<ExtendedDisjunct> disjuncts(target.begin(), target.end());
+    std::copy(axioms.begin(), axioms.end(), std::back_inserter(disjuncts));
+
+    // rename variables
+    NameAllocator allocator;
+    disjuncts.front().disjunct.commitVarNames(allocator);
+    for (int i = 1; i < disjuncts.size(); ++i)
+      disjuncts[i].disjunct = disjuncts[i].disjunct.renamedFreeVars(allocator);
+
+    // reset ids
+    for (int i = 0; i < disjuncts.size(); ++i)
+      disjuncts[i].id = i;
+
+    // combinations loop
+    std::optional<Subst> result;
+    constexpr auto max_iter = 100;
+    for (int right_id = 1;
+         right_id < disjuncts.size() && right_id < max_iter && !result;
+         ++right_id) {
+      for (int left_id = 0; left_id < right_id; ++left_id) {
+        auto res =
+            resolve(disjuncts[left_id], disjuncts[right_id], disjuncts.size());
+        if (!res)
+          continue;
+        res->disjunct = res->disjunct.renamedFreeVars(allocator);
+        disjuncts.push_back(*res);
+        if (res->disjunct.size() == 0) {
+          result = res->subst;
           break;
         }
-
-        if (!wasNew) {
-          auto pairIter = axioms.begin();
-          while (pairIter != axioms.end()) {
-            if (pairsTested.count({refIter->id, pairIter->id})) {
-              pairIter++;
-              continue;
-            }
-            auto res = resolve(*refIter, *pairIter, nextID);
-            if (!res) {
-              pairIter++;
-              continue;
-            }
-            std::cout << "resolved with axioms:\n";
-            std::cout << "d1:  " << refIter->disjunct.toString() << "\n";
-            std::cout << "d2:  " << pairIter->disjunct.toString() << "\n";
-            std::cout << "res: " << res->disjunct.toString() << "\n";
-            std::cout << "subst: " << res->subst.toString() << "\n";
-            if (res->disjunct.size() == 0)
-              return res->subst;
-            pairsTested.insert({refIter->id, pairIter->id});
-            pairsTested.insert({pairIter->id, refIter->id});
-            target.push_back(*res);
-            wasNew = true;
-            break;
-          }
-        }
-        if (wasNew)
-          break;
-        refIter++;
       }
     }
 
-    return std::nullopt;
+    // output resolution steps
+    if (result)
+      printResolutionChain(disjuncts);
+
+    return result;
   }
 
   // Алгоритм резолюции цель уже должна быть приведена к КНФ с примененным
@@ -707,11 +707,10 @@ public:
   template <typename T> std::optional<Subst> resolve(T axioms, T target) {
     std::list<ExtendedDisjunct> extAxioms;
     std::list<ExtendedDisjunct> extTarget;
-    int id = 0;
     for (auto &axiom : axioms)
-      extAxioms.push_back({id++, axiom, {}, {-1, -1}});
+      extAxioms.push_back({-1, axiom, {}, {-1, -1}});
     for (auto &tar : target)
-      extTarget.push_back({id++, tar, {}, {-1, -1}});
-    return resolve(std::move(extAxioms), std::move(extTarget), id);
+      extTarget.push_back({-1, tar, {}, {-1, -1}});
+    return resolve(std::move(extAxioms), std::move(extTarget));
   }
 };

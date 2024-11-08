@@ -1,6 +1,7 @@
 #include "normalizer.h"
 #include "parser/expr_parser.h"
 #include "resolver_new.h"
+#include <fstream>
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -16,6 +17,30 @@ Disjunct parseDisjunct(const char *text) {
 
 std::vector<Disjunct> parseDisjuncts(const char *text) {
   return ExprNormalizer().scolemForm(ExprParser().Parse(text));
+}
+
+std::ostream &operator<<(std::ostream &stream, const Disjunct &value) {
+  return stream << value.toString();
+}
+
+std::ostream &operator<<(std::ostream &stream,
+                         const std::vector<Disjunct> &values) {
+  bool first = true;
+  for (auto &val : values) {
+    if (!first)
+      stream << ", ";
+    first = false;
+    stream << val;
+  }
+  return stream;
+}
+
+template <typename T> auto resolveNice(const T &axioms, const T &target) {
+  std::cout << "axioms:  " << axioms << std::endl;
+  std::cout << "~target: " << target << std::endl;
+
+  auto res = ResolverNew().resolve(axioms, target);
+  return res;
 }
 
 TEST(NameAllocTest, simpleCase) {
@@ -124,7 +149,7 @@ TEST(ResolverNewTest, resolutionSimple) {
   auto axioms = parseDisjuncts("A & (~A + B)");
   auto target = parseDisjuncts("~B");
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = resolveNice(axioms, target);
 
   EXPECT_TRUE(res);
   if (res)
@@ -135,7 +160,7 @@ TEST(ResolverNewTest, resolutionTransitive) {
   auto axioms = parseDisjuncts("(A -> B) & (B -> C)");
   auto target = parseDisjuncts("~(A -> C)");
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = resolveNice(axioms, target);
 
   EXPECT_TRUE(res);
   if (res)
@@ -147,7 +172,7 @@ TEST(ResolverNewTest, resolutionPredicates) {
       parseDisjuncts("(A -> \\exists(x) P(x)) & (\\exists(x) (Q(x) -> A))");
   auto target = parseDisjuncts("~(\\exists(x) (Q(x) -> P(x)))");
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = resolveNice(axioms, target);
 
   EXPECT_TRUE(res);
   if (res)
@@ -160,7 +185,7 @@ TEST(ResolverNewTest, resolutionTransitivePred) {
                      "P(3, 4) & P(4, 5) & P(5, 6)");
   auto target = parseDisjuncts("~P(3, 6)");
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = resolveNice(axioms, target);
 
   EXPECT_TRUE(res);
   if (res)
@@ -176,9 +201,19 @@ TEST(ResolverNewTest, resolutionLectionEx1) {
                                "L(Petya, Snow)");
   auto target = parseDisjuncts("~(\\exists(x) (M(x) & ~S(x)))");
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = resolveNice(axioms, target);
 
   EXPECT_TRUE(res);
   if (res)
     std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, listLen2) {
+  auto axioms = parseDisjuncts("\\forall(x, y, z) (Len(x, y) -> Len(cons(z, "
+                               "x), succ(y))) & Len(Nil, 0)");
+  auto target = parseDisjuncts("~(\\exists(x) Len(x, succ(succ(0))))");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
 }

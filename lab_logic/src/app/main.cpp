@@ -1,8 +1,34 @@
-#include "expr_parser.h"
-#include "resolver.h"
+#include "normalizer.h"
+#include "parser/expr.h"
+#include "parser/expr_parser.h"
+#include "resolver_new.h"
 #include <exception>
 #include <iostream>
 #include <sstream>
+
+auto unify(Expr::ptr leftExpr, Expr::ptr rightExpr) {
+  rightExpr = Expr::createInverse(rightExpr);
+  auto leftDisj = ExprNormalizer().scolemForm(leftExpr);
+  auto rightDisj = ExprNormalizer().scolemForm(rightExpr);
+
+  auto leftAtom = *leftDisj[0].begin();
+  auto rightAtom = *rightDisj[0].begin();
+
+  return ResolverNew().unify(leftAtom, rightAtom);
+}
+
+bool implies(std::list<Expr::ptr> axiomExprs, Expr::ptr targetExpr) {
+  targetExpr = Expr::createInverse(targetExpr);
+  auto axiomExpr =
+      Expr::createConjunction(axiomExprs.begin(), axiomExprs.end());
+
+  auto axioms = ExprNormalizer().scolemForm(axiomExpr);
+  auto target = ExprNormalizer().scolemForm(targetExpr);
+
+  auto res = ResolverNew().resolve(axioms, target);
+
+  return res.has_value();
+}
 
 std::list<Expr::ptr> parseRules(const std::string &line) {
   if (line.empty())
@@ -42,7 +68,7 @@ void replResolve() {
       std::cout << "failed to parse: " << err.what() << std::endl;
       continue;
     }
-    if (Resolver().Implies(axioms, conclusion))
+    if (implies(axioms, conclusion))
       std::cout << "resolved: yes\n";
     else
       std::cout << "resolved: no\n";
@@ -74,8 +100,7 @@ void replUnify() {
       std::cout << "failed to parse: " << err.what() << std::endl;
       continue;
     }
-    auto res = Resolver().unifyTerms(left, right);
-    if (res)
+    if (auto res = unify(left, right))
       std::cout << "unified successfully, subst: " << res->toString()
                 << std::endl;
     else
