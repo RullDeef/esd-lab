@@ -1,171 +1,235 @@
+#include "normalizer.h"
 #include "parser/expr_parser.h"
 #include "resolver.h"
 #include <gtest/gtest.h>
-#include <list>
+#include <memory>
 
-TEST(ResolverTest, SimpleCase) {
-  std::list<Expr::ptr> sources = {
-      Expr::createImplication(Expr::createAtom("A"), Expr::createAtom("B")),
-      Expr::createAtom("A"),
-  };
-  Expr::ptr target = Expr::createAtom("B");
-
-  bool satisfied = Resolver().Implies(sources, target);
-  ASSERT_TRUE(satisfied);
+Atom parseAtom(const char *text) {
+  auto disj = ExprNormalizer().scolemForm(ExprParser().Parse(text));
+  return *disj[0].begin();
 }
 
-TEST(ResolverTest, ContrapositionHalf) {
-  std::list<Expr::ptr> sources = {
-      Expr::createImplication(Expr::createAtom("A"), Expr::createAtom("B")),
-  };
-  Expr::ptr target =
-      Expr::createImplication(Expr::createInverse(Expr::createAtom("B")),
-                              Expr::createInverse(Expr::createAtom("A")));
-
-  bool satisfied = Resolver().Implies(sources, target);
-  ASSERT_TRUE(satisfied);
+Disjunct parseDisjunct(const char *text) {
+  auto disj = ExprNormalizer().scolemForm(ExprParser().Parse(text));
+  return disj[0];
 }
 
-TEST(ResolverTest, identity) {
-  Expr::ptr source = Expr::createTrue();
-  Expr::ptr target = Expr::createTrue();
-
-  bool satisfied = Resolver().Implies(source, target);
-  ASSERT_TRUE(satisfied);
+std::vector<Disjunct> parseDisjuncts(const char *text) {
+  return ExprNormalizer().scolemForm(ExprParser().Parse(text));
 }
 
-TEST(ResolverTest, reversedIdentity) {
-  Expr::ptr source = Expr::createTrue();
-  Expr::ptr target = Expr::createFalse();
-
-  bool satisfied = Resolver().Implies(source, target);
-  ASSERT_FALSE(satisfied);
+std::ostream &operator<<(std::ostream &stream, const Disjunct &value) {
+  return stream << value.toString();
 }
 
-TEST(ResolverTest, equality) {
-  Expr::ptr target = ExprParser().Parse("A = A");
-
-  bool satisfied = Resolver().Implies(Expr::createTrue(), target);
-  ASSERT_TRUE(satisfied);
+std::ostream &operator<<(std::ostream &stream,
+                         const std::vector<Disjunct> &values) {
+  bool first = true;
+  for (auto &val : values) {
+    if (!first)
+      stream << ", ";
+    first = false;
+    stream << val;
+  }
+  return stream;
 }
 
-TEST(ResolverTest, predicatesSimple) {
-  std::list<Expr::ptr> axioms;
-  Expr::ptr target;
+template <typename T> auto resolveNice(const T &axioms, const T &target) {
+  std::cout << "axioms:  " << axioms << std::endl;
+  std::cout << "~target: " << target << std::endl;
 
-  EXPECT_NO_THROW(
-      axioms.push_back(ExprParser().Parse("\\forall(x) (P(x) -> Q(x))")));
-  EXPECT_NO_THROW(axioms.push_back(ExprParser().Parse("P(A)")));
-
-  EXPECT_NO_THROW(target = ExprParser().Parse("Q(A)"));
-
-  bool satisfied = Resolver().Implies(axioms, target);
-  ASSERT_TRUE(satisfied);
+  auto res = Resolver().resolve(axioms, target);
+  return res;
 }
 
-TEST(ResolverTest, scolemForm) {
-  /**
-   * Задачи из
-   * http://logic.math.msu.ru/wp-content/uploads/vml/2008/t34predicat.pdf
-   *
-   * 2. Доказать, что формула
-   *
-   *   \forall(x) \exists(y) P(x, y) & \forall(x, y) (P(x, y) -> ~P(y, x)) &
-   *   & \forall(x, y, z) (P(x, y) -> (P(y, z) -> P(x, z)))
-   *
-   *   выполнима [, но не выполнима ни в какой конечной модели].
-   */
+TEST(NameAllocTest, simpleCase) {
+  NameAllocator allocator;
 
-  GTEST_SKIP();
-  Expr::ptr target;
+  EXPECT_TRUE(allocator.allocateName("x"));
+  EXPECT_TRUE(allocator.allocateName("y"));
+  EXPECT_TRUE(allocator.allocateName("x1"));
 
-  EXPECT_NO_THROW(target = ExprParser().Parse(
-                      "\\forall(X) \\exists(Y) P(X, Y) & \\forall(X, Y) (P(X, "
-                      "Y) -> ~P(Y, X)) & \\forall(X, Y, Z) (P(X, Y) -> (P(Y, "
-                      "Z) -> P(X, Z)))"));
+  EXPECT_FALSE(allocator.allocateName("y0"));
 
-  bool satisfied = Resolver().Implies(nullptr, target);
-  ASSERT_TRUE(satisfied);
+  EXPECT_EQ(allocator.allocateRenaming("x"), "x2");
 }
 
-TEST(ResolverTest, diffExists) {
-  std::list<Expr::ptr> axioms = {ExprParser().Parse("A -> \\exists(x) P(x)"),
-                                 ExprParser().Parse("\\exists(x) (Q(x) -> A)")};
-  Expr::ptr target = ExprParser().Parse("\\exists(x) (Q(x) -> P(x))");
+TEST(SubstTest, conflictingRings) {
+  Subst left;
+  left.insert("x", std::make_shared<Variable>(true, "A"));
+  left.insert("y", std::make_shared<Variable>(true, "B"));
+  Subst right;
+  right.link("x", "y");
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_FALSE(satisfied);
+  auto sum = left + right;
+  EXPECT_FALSE(sum);
+  if (sum) {
+    std::cout << "got " << sum->toString() << std::endl;
+  }
 }
 
-TEST(ResolverTest, contrapositionPredicates) {
-  std::list<Expr::ptr> axioms = {
-      ExprParser().Parse("\\forall(x) (P(x) -> \\exists(y) Q(x, y))"),
-      ExprParser().Parse("~(\\exists(x) \\forall(y) Q(y, x))")};
-  Expr::ptr target = ExprParser().Parse("\\exists(x) ~P(x)");
+TEST(SubstTest, hardCase) {
+  Subst left;
+  left.insert(
+      "x", std::make_shared<Variable>(
+               false, "f", std::vector{std::make_shared<Variable>(true, "y")}));
+  Subst right;
+  right.insert("x", std::make_shared<Variable>(
+                        false, "f",
+                        std::vector{std::make_shared<Variable>(false, "A")}));
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_TRUE(satisfied);
+  auto sum = left + right;
+  EXPECT_TRUE(sum);
+  if (sum) {
+    std::cout << "got " << sum->toString() << std::endl;
+  }
 }
 
-TEST(ResolverTest, transitivity) {
-  std::list<Expr::ptr> axioms = {
-      // P(x, y) <=> x < y --- is transitive relation
-      ExprParser().Parse("\\forall(x, y, z) (P(x, z) & P(z, y) -> P(x, y))"),
-      // some facts
-      ExprParser().Parse("P(3, 4) & P(4, 5) & P(5, 6)"),
-  };
-  Expr::ptr target = ExprParser().Parse("P(3, 6)");
+TEST(DisjunctTest, renameVars) {
+  Disjunct disj = parseDisjunct("P(x, y, x3) + Q(f(x1, y), z)");
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_TRUE(satisfied);
+  NameAllocator allocator;
+  disj.commitVarNames(allocator);
+
+  std::cout << "allocated names: " << allocator.toString() << std::endl;
+  Disjunct disj2 = disj.renamedVars(allocator);
+  std::cout << "allocated after: " << allocator.toString() << std::endl;
+
+  EXPECT_EQ(disj2.toString(), "P(x2, y1, x4) + Q(f(x5, y1), z1)");
 }
 
-TEST(ResolverTest, lectionEx1) {
-  std::list<Expr::ptr> axioms = {
-      ExprParser().Parse("\\forall(x) (S(x) + M(x))"),
-      ExprParser().Parse("~(\\exists(x1) (M(x1) & L(x1, Rain)))"),
-      ExprParser().Parse("\\forall(x2) (S(x2) -> L(x2, Snow))"),
-      ExprParser().Parse("\\forall(y) (L(Lena, y) = ~L(Petya, y))"),
-      ExprParser().Parse("L(Petya, Rain)"),
-      ExprParser().Parse("L(Petya, Snow)"),
-  };
-  Expr::ptr target = ExprParser().Parse("\\exists(x3) (M(x3) & ~S(x3))");
+TEST(ResolverNewTest, unifySimple) {
+  auto left = parseAtom("~R(x)");
+  auto right = parseAtom("R(A)");
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_TRUE(satisfied);
+  auto res = Resolver().unify(left, right);
+  EXPECT_TRUE(res);
+  std::cout << "left: " << left.toString() << std::endl
+            << "right: " << right.toString() << std::endl
+            << "subst: " << res->toString() << std::endl;
 }
 
-TEST(ResolverTest, booleanLogic) {
-  // And(x, y, z) <=> x & y = z
-  // Or(x, y, z)  <=> x + y = z
-  std::list<Expr::ptr> axioms = {
-      ExprParser().Parse("\\forall(x) And(x, B0, B0) & And(x, B1, x)"),
-      ExprParser().Parse("\\forall(x) Or(x, B1, B1) & Or(x, B0, x)"),
-      ExprParser().Parse("\\forall(x, y, z) (And(x, y, z) = And(y, x, z))"),
-      ExprParser().Parse("\\forall(x, y, z) (Or(x, y, z) = Or(y, x, z))"),
-  };
-  // (1 & 0) + (0 + 1) = 1
-  // Or(a, b, 1)
-  // And(1, 0, a)
-  // Or(0, 1, b)
-  Expr::ptr target =
-      ExprParser().Parse("Or(a, b, B1) & And(B1, B0, a) & Or(B0, B1, b)");
+TEST(ResolverNewTest, conflictLinkage) {
+  auto left = parseAtom("~Q(S, x, F, G, y, H)");
+  auto right = parseAtom("Q(y, A, F, G, x, H)");
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_TRUE(satisfied);
+  auto res = Resolver().unify(left, right);
+  EXPECT_FALSE(res);
 }
 
-TEST(ResolverTest, listLength) {
-  GTEST_SKIP();
-  std::list<Expr::ptr> axioms = {
-      ExprParser().Parse(
-          "\\forall(y, z) (Len(y, z) -> \\exists(x) Len(Cons(x, y), succ(z)))"),
-      ExprParser().Parse("Len(Nil, 0)"),
-  };
-  // Len([A, B, C], succ(succ(succ(0))))
-  Expr::ptr target = ExprParser().Parse(
-      "Len(Cons(A, Cons(B, Cons(C, Nil))), succ(succ(succ(0))))");
+TEST(ResolverNewTest, conflictLinkage2) {
+  auto left = parseAtom("~B(P, x, r(G, Q), K, T, y, U)");
+  auto right = parseAtom("B(P, Q, r(G, Q), y, T, x, U)");
 
-  bool satisfied = Resolver().Implies(axioms, target);
-  EXPECT_TRUE(satisfied);
+  auto res = Resolver().unify(left, right);
+  EXPECT_FALSE(res);
+}
+
+TEST(ResolverNewTest, subFuncs) {
+  auto left = parseAtom("~P(x, f(x, B, g(y)), g(C))");
+  auto right = parseAtom("P(A, f(A, B, z), g(y))");
+
+  auto res = Resolver().unify(left, right);
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(), "{x=A, y=C, z=g(C)}");
+}
+
+TEST(ResolverNewTest, recursiveFunc) {
+  auto left = parseAtom("~P(x, f(g(x)))");
+  auto right = parseAtom("P(y, y)");
+
+  auto res = Resolver().unify(left, right);
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(), "{x=y=f(g(...))}");
+}
+
+TEST(ResolverNewTest, recursiveHard) {
+  auto left = parseAtom("~H(x, g(z), z, o(x))");
+  auto right = parseAtom("H(f(y), y, t(x), o(x))");
+
+  auto res = Resolver().unify(left, right);
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(),
+            "{x=f(g(t(...))), y=g(t(f(...))), z=t(f(g(...)))}");
+}
+
+TEST(ResolverNewTest, recursiveConflict) {
+  auto left = parseAtom("~R(x, y, g(y))");
+  auto right = parseAtom("R(f(y), k(x), x)");
+
+  auto res = Resolver().unify(left, right);
+  EXPECT_FALSE(res);
+}
+
+TEST(ResolverNewTest, resolutionSimple) {
+  auto axioms = parseDisjuncts("A & (~A + B)");
+  auto target = parseDisjuncts("~B");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
+  if (res)
+    std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, resolutionTransitive) {
+  auto axioms = parseDisjuncts("(A -> B) & (B -> C)");
+  auto target = parseDisjuncts("~(A -> C)");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
+  if (res)
+    std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, resolutionPredicates) {
+  auto axioms =
+      parseDisjuncts("(A -> \\exists(x) P(x)) & (\\exists(x) (Q(x) -> A))");
+  auto target = parseDisjuncts("~(\\exists(x) (Q(x) -> P(x)))");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
+  if (res)
+    std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, resolutionTransitivePred) {
+  auto axioms =
+      parseDisjuncts("(\\forall(x, y, z) ((P(x, z) & P(z, y)) -> P(x, y))) & "
+                     "P(3, 4) & P(4, 5) & P(5, 6)");
+  auto target = parseDisjuncts("~P(3, 6)");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
+  if (res)
+    std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, resolutionLectionEx1) {
+  auto axioms = parseDisjuncts("(\\forall(x) (S(x) + M(x))) & "
+                               "~(\\exists(x) (M(x) & L(x, Lena))) & "
+                               "(\\forall(x) (S(x) -> L(x, Snow))) & "
+                               "(\\forall(y) (L(Lena, y) = ~L(Petya, y))) & "
+                               "L(Petya, Rain) & "
+                               "L(Petya, Snow)");
+  auto target = parseDisjuncts("~(\\exists(x) (M(x) & ~S(x)))");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
+  if (res)
+    std::cout << "res: " << res->toString() << std::endl;
+}
+
+TEST(ResolverNewTest, listLen2) {
+  auto axioms = parseDisjuncts("\\forall(x, y, z) (Len(x, y) -> Len(cons(z, "
+                               "x), succ(y))) & Len(Nil, 0)");
+  auto target = parseDisjuncts("~(\\exists(x) Len(x, succ(succ(0))))");
+
+  auto res = resolveNice(axioms, target);
+
+  EXPECT_TRUE(res);
 }

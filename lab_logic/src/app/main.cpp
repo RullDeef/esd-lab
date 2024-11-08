@@ -14,7 +14,7 @@ auto unify(Expr::ptr leftExpr, Expr::ptr rightExpr) {
   auto leftAtom = *leftDisj[0].begin();
   auto rightAtom = *rightDisj[0].begin();
 
-  return ResolverNew().unify(leftAtom, rightAtom);
+  return Resolver().unify(leftAtom, rightAtom);
 }
 
 bool implies(std::list<Expr::ptr> axiomExprs, Expr::ptr targetExpr) {
@@ -25,7 +25,7 @@ bool implies(std::list<Expr::ptr> axiomExprs, Expr::ptr targetExpr) {
   auto axioms = ExprNormalizer().scolemForm(axiomExpr);
   auto target = ExprNormalizer().scolemForm(targetExpr);
 
-  auto res = ResolverNew().resolve(axioms, target);
+  auto res = Resolver().resolve(axioms, target);
 
   return res.has_value();
 }

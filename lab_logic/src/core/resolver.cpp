@@ -1,262 +1,181 @@
 #include "resolver.h"
-#include "substitution.h"
-#include <algorithm>
+#include "subst.h"
 #include <iostream>
-#include <ostream>
-#include <string>
 
-struct DisjunctionComparator {
-  bool operator()(const Expr::ptr &left, const Expr::ptr &right) const {
-    int leftSize = left->getOperands().size();
-    int rightSize = right->getOperands().size();
-    return leftSize <= rightSize;
-  }
-
-  bool operator()(const std::pair<Expr::ptr, Substitution> &left,
-                  const std::pair<Expr::ptr, Substitution> &right) const {
-    return this->operator()(left.first, right.first);
-  }
-};
-
-static bool startsUpper(const std::string &value) {
-  return !value.empty() && std::isupper(value[0]) &&
-         !('0' <= value[0] && value[0] <= '9');
-}
-
-std::optional<Substitution>
-Resolver::unifyTerms(Expr::ptr left, Expr::ptr right, bool topLevel) {
-  bool left_predicate = !left->getOperands().empty();
-  bool left_var =
-      !left_predicate && !startsUpper(left->getValue()) && !topLevel;
-  bool left_const = !left_predicate && !left_var;
-  bool right_predicate = !right->getOperands().empty();
-  bool right_var =
-      !right_predicate && !startsUpper(right->getValue()) && !topLevel;
-  bool right_const = !right_predicate && !right_var;
-
-  if (left_const && right_const) {
-    return left->getValue() == right->getValue()
-               ? std::make_optional<Substitution>()
-               : std::nullopt;
-  } else if ((left_const || left_predicate) && right_var) {
-    Substitution subst;
-    subst.add(right->getValue(), left);
-    return std::move(subst);
-  } else if ((right_const || right_predicate) && left_var) {
-    Substitution subst;
-    subst.add(left->getValue(), right);
-    return std::move(subst);
-  } else if (left_predicate && right_predicate) {
+std::optional<Subst> Resolver::unify(const Variable::ptr &left,
+                                     const Variable::ptr &right) {
+  if (left->isConst() && right->isConst()) {
     if (left->getValue() != right->getValue())
       return std::nullopt;
-    auto leftOperands = left->getOperands();
-    auto rightOperands = right->getOperands();
-    if (leftOperands.size() != rightOperands.size())
+    else
+      return std::make_optional<Subst>();
+  }
+  if (left->isVariable() && !right->isVariable()) {
+    Subst res;
+    res.insert(left->getValue(), right);
+    return std::move(res);
+  }
+  if (!left->isVariable() && right->isVariable()) {
+    Subst res;
+    res.insert(right->getValue(), left);
+    return std::move(res);
+  }
+  if (left->isVariable() && right->isVariable()) {
+    Subst res;
+    if (left->getValue() != right->getValue())
+      res.link(left->getValue(), right->getValue());
+    return std::move(res);
+  }
+  // ниже - унификация функциональных символов
+  if (left->getValue() != right->getValue())
+    return std::nullopt;
+  const auto &args1 = left->getArguments();
+  const auto &args2 = right->getArguments();
+  if (args1.size() != args2.size())
+    return std::nullopt;
+  Subst res;
+  for (int i = 0; i < args1.size(); ++i) {
+    auto subst = unify(args1[i], args2[i]);
+    if (!subst)
       return std::nullopt;
-    Substitution subst;
-    for (int i = 0; i < leftOperands.size(); ++i) {
-      auto part = unifyTerms(leftOperands[i], rightOperands[i], false);
-      if (!part)
-        return std::nullopt;
-      if (subst.conflicts(*part))
-        return std::nullopt;
-      subst += *part;
+    subst = res + *subst;
+    if (!subst) // возник конфликт подстановок
+      return std::nullopt;
+    res = *subst;
+  }
+  return std::move(res);
+}
+
+std::optional<Subst> Resolver::unify(const Atom &left, const Atom &right) {
+  if (left.getName() != right.getName() ||
+      left.isInverse() == right.isInverse())
+    return std::nullopt;
+  auto &args1 = left.getArguments();
+  auto &args2 = right.getArguments();
+  if (args1.size() != args2.size())
+    return std::nullopt;
+  Subst res;
+  for (int i = 0; i < args1.size(); ++i) {
+    auto subst = unify(args1[i], args2[i]);
+    if (!subst)
+      return std::nullopt;
+    subst = res + *subst;
+    if (!subst) // возник конфликт подстановок
+      return std::nullopt;
+    res = *subst;
+  }
+  return std::move(res);
+}
+
+std::optional<Disjunct> Resolver::resolve(const Disjunct &left,
+                                          const Disjunct &right) {
+  for (int i = 0; i < left.size(); ++i)
+    for (int j = 0; j < right.size(); ++j)
+      if (auto subst = unify(left[i], right[j]))
+        return subst->apply(left.withoutNth(i) + right.withoutNth(j));
+  return std::nullopt;
+}
+
+std::optional<ExtendedDisjunct> Resolver::resolve(const ExtendedDisjunct &left,
+                                                  const ExtendedDisjunct &right,
+                                                  int nextID) {
+  for (int i = 0; i < left.disjunct.size(); ++i) {
+    for (int j = 0; j < right.disjunct.size(); ++j) {
+      if (auto subst = unify(left.disjunct[i], right.disjunct[j])) {
+        auto disj = subst->apply(left.disjunct.withoutNth(i) +
+                                 right.disjunct.withoutNth(j));
+        return ExtendedDisjunct{nextID, disj, *subst, {left.id, right.id}};
+      }
     }
-    return std::move(subst);
-  } else if (left_var && right_var) {
-    Substitution subst;
-    subst.add(left->getValue(), right);
-    return std::move(subst);
   }
   return std::nullopt;
 }
 
-std::optional<Substitution> Resolver::unifyInversePair(Expr::ptr left,
-                                                       Expr::ptr right) {
-  if (left->getType() == Expr::Type::inverse &&
-      right->getType() == Expr::Type::atom)
-    return unifyInversePair(std::move(right), std::move(left));
-  if (left->getType() != Expr::Type::atom ||
-      right->getType() != Expr::Type::inverse)
-    return std::nullopt;
-  return unifyTerms(left, right->getOperands()[0]);
+void Resolver::populateIndexes(const std::vector<ExtendedDisjunct> &disjuncts,
+                               std::set<int> &set, int index) {
+  if (index == -1)
+    index = disjuncts.size() - 1;
+  set.insert(index);
+  if (disjuncts[index].parent_id[0] != -1) {
+    populateIndexes(disjuncts, set, disjuncts[index].parent_id[0]);
+    populateIndexes(disjuncts, set, disjuncts[index].parent_id[1]);
+  }
 }
 
-std::optional<std::pair<Expr::ptr, Substitution>>
-Resolver::tryResolve(const std::pair<Expr::ptr, Substitution> &disjunction1,
-                     const std::pair<Expr::ptr, Substitution> &disjunction2) {
-  // cross apply substitutions
-  Substitution sub1 = disjunction1.second;
-  Substitution sub2 = disjunction2.second;
-  auto disAtoms1 = sub2.applyTo(disjunction1.first)->getOperands();
-  auto disAtoms2 = sub1.applyTo(disjunction2.first)->getOperands();
+void Resolver::printResolutionChain(
+    const std::vector<ExtendedDisjunct> &disjuncts) {
+  std::set<int> indexSet;
+  populateIndexes(disjuncts, indexSet);
 
-  std::optional<Substitution> subst;
-  for (int i = 0; i < disAtoms1.size(); ++i) {
-    for (int j = 0; j < disAtoms2.size(); ++j) {
-      subst = unifyInversePair(disAtoms1[i], disAtoms2[j]);
-      if (subst) {
-        disAtoms1.erase(disAtoms1.begin() + i);
-        disAtoms2.erase(disAtoms2.begin() + j);
-        std::copy(disAtoms2.begin(), disAtoms2.end(),
-                  std::back_inserter(disAtoms1));
+  std::map<int, int> renum;
+  for (auto index : indexSet) {
+    int num = renum.size() + 1;
+    renum[index] = num;
+    if (disjuncts[index].parent_id[0] == -1) {
+      // axiom, used
+      std::cout << num << ") " << disjuncts[index].disjunct.toString()
+                << std::endl;
+    } else {
+      std::cout << num << ") " << disjuncts[index].disjunct.toString() << " ("
+                << renum[disjuncts[index].parent_id[0]] << " + "
+                << renum[disjuncts[index].parent_id[1]] << ") "
+                << disjuncts[index].subst.toString() << "\n";
+    }
+  }
+}
+
+std::optional<Subst> Resolver::resolve(std::list<ExtendedDisjunct> axioms,
+                                       std::list<ExtendedDisjunct> target) {
+  // combine all disjuncts in single vector
+  std::vector<ExtendedDisjunct> disjuncts(target.begin(), target.end());
+  std::copy(axioms.begin(), axioms.end(), std::back_inserter(disjuncts));
+
+  // rename variables
+  NameAllocator allocator;
+  disjuncts.front().disjunct.commitVarNames(allocator);
+  for (int i = 1; i < disjuncts.size(); ++i)
+    disjuncts[i].disjunct = disjuncts[i].disjunct.renamedVars(allocator);
+
+  // reset ids
+  for (int i = 0; i < disjuncts.size(); ++i)
+    disjuncts[i].id = i;
+
+  // combinations loop
+  std::optional<Subst> result;
+  constexpr auto max_iter = 100;
+  for (int right_id = 1;
+       right_id < disjuncts.size() && right_id < max_iter && !result;
+       ++right_id) {
+    for (int left_id = 0; left_id < right_id; ++left_id) {
+      auto res =
+          resolve(disjuncts[left_id], disjuncts[right_id], disjuncts.size());
+      if (!res)
+        continue;
+      res->disjunct = res->disjunct.renamedVars(allocator);
+      disjuncts.push_back(*res);
+      if (res->disjunct.size() == 0) {
+        result = res->subst;
         break;
       }
     }
-    if (subst)
-      break;
   }
-  if (!subst)
-    return std::nullopt;
-  for (auto &atom : disAtoms1)
-    atom = subst->applyTo(std::move(atom));
-  *subst += sub1;
-  *subst += sub2;
-  auto rule = std::make_shared<Expr>(Expr::Type::disjunction, disAtoms1);
-  return std::make_pair(rule, *subst);
+
+  // output resolution steps
+  if (result)
+    printResolutionChain(disjuncts);
+
+  return result;
 }
 
-bool Resolver::Implies(std::list<Expr::ptr> source, Expr::ptr target) {
-  Expr::ptr sourceAnd;
-  if (source.size() > 0)
-    sourceAnd = Expr::createConjunction(source.begin(), source.end());
-  std::cout << "normal form: " << sourceAnd->toNormalForm()->toString()
-            << std::endl;
-  std::cout << "scolem form: " << sourceAnd->toScolemForm()->toString()
-            << std::endl;
-  return Implies(sourceAnd, target);
-}
-
-bool Resolver::Implies(Expr::ptr source, Expr::ptr target) {
-  if (target->toString() == "1")
-    return true;
-  if (target->toString() == "0")
-    return false;
-
-  // привести правила к сколемовской нормальной форме
-  int replacementCounter = 0;
-  if (source)
-    source = source->toScolemForm(&replacementCounter);
-  target = Expr::createInverse(target)->toScolemForm(&replacementCounter);
-
-  // выделить список элементарных дизъюнктов
-  std::set<std::string> renamings;
-  m_axiomSet =
-      source ? disjunctionsTransform(source->getDisjunctionsList(), renamings)
-             : std::list<std::pair<Expr::ptr, Substitution>>{};
-  m_referenceSet =
-      disjunctionsTransform(target->getDisjunctionsList(), renamings);
-
-  // отсортировать списки в порядке возрастания кол-ва атомов
-  m_axiomSet.sort(DisjunctionComparator{});
-  m_referenceSet.sort(DisjunctionComparator{});
-
-  PrintState();
-
-  int retryCounter = 0;
-
-  // реализуем стратегию с опорным множеством
-  while (!m_referenceSet.empty() && retryCounter <= m_referenceSet.size()) {
-    // берем один дизъюнкт из опорного множества и ищем ему пару среди
-    // дизъюнктов опорного множества и, если не нашли - ищем в аксиомах.
-    auto ref = m_referenceSet.front();
-    m_referenceSet.pop_front();
-
-    std::list<std::pair<Expr::ptr, Substitution>>::iterator pair =
-        m_referenceSet.begin();
-    while (pair != m_referenceSet.end()) {
-      if (auto res = tryResolve(ref, *pair)) {
-        if (res->first->getOperands().size() == 0) {
-          std::cout << "found empty disjunction with refset: "
-                    << ref.first->toString() << " and "
-                    << pair->first->toString()
-                    << " (subst: " << pair->second.toString() << ")"
-                    << std::endl;
-          return true;
-        }
-        std::cout << "resolved with refset: " << ref.first->toString()
-                  << " and " << pair->first->toString()
-                  << " (subst: " << pair->second.toString() << ")" << std::endl;
-        // m_referenceSet.erase(pair);
-        m_referenceSet.push_front(*res);
-        PrintState();
-        retryCounter = 0;
-        break;
-      }
-      pair++;
-    }
-    if (pair == m_referenceSet.end()) {
-      // не нашли пару среди опорных дизъюнктов - ищем среди аксиом
-      pair = m_axiomSet.begin();
-      while (pair != m_axiomSet.end()) {
-        if (auto res = tryResolve(ref, *pair)) {
-          if (res->first->getOperands().size() == 0) {
-            std::cout << "found empty disjunction with axiom: "
-                      << ref.first->toString() << " and "
-                      << pair->first->toString()
-                      << " (subst: " << res->second.toString() << ")"
-                      << std::endl;
-            return true;
-          }
-          std::cout << "resolved with axioms: " << ref.first->toString()
-                    << " and " << pair->first->toString()
-                    << " (subst: " << res->second.toString() << ")"
-                    << std::endl;
-          // m_axiomSet.erase(pair);
-          m_referenceSet.push_front(*res);
-          PrintState();
-          retryCounter = 0;
-          break;
-        }
-        pair++;
-      }
-      if (pair == m_axiomSet.end()) {
-        // не нашли пару нигде - если дизъюнкт содержит переменные - засовываем
-        // его обратно в конец опорного множества
-        if (!ref.first->getFreeVars().empty() || !ref.second.empty()) {
-          m_referenceSet.push_back(std::move(ref));
-          retryCounter++;
-        }
-      }
-    }
-    // если ничего не нашли - значит резолюция для данного дизъюнкта невозможна
-    // - просто отбрасываем его
-  };
-
-  // обошли все возможные дизъюнкты в опорном множестве и не получили пустой
-  // дизъюнкт - исходное утверждение не доказано
-  return false;
-}
-
-std::list<std::pair<Expr::ptr, Substitution>>
-Resolver::disjunctionsTransform(std::list<Expr::ptr> disjunctions,
-                                std::set<std::string> &renamings) {
-  std::list<std::pair<Expr::ptr, Substitution>> res;
-  for (auto &disjunction : disjunctions)
-    res.push_back(std::make_pair(std::move(disjunction), Substitution()));
-  return res;
-}
-
-void Resolver::PrintState() {
-  std::cout << "axioms: ";
-  bool first = true;
-  for (const auto &rule : m_axiomSet) {
-    if (!first)
-      std::cout << ", ";
-    first = false;
-    std::cout << rule.first->toString();
-    if (!rule.second.empty())
-      std::cout << rule.second.toString();
-  }
-  std::cout << "\nrefset: ";
-  first = true;
-  for (const auto &rule : m_referenceSet) {
-    if (!first)
-      std::cout << ", ";
-    first = false;
-    std::cout << rule.first->toString();
-    if (!rule.second.empty())
-      std::cout << rule.second.toString();
-  }
-  std::cout << std::endl;
+// Алгоритм резолюции цель уже должна быть приведена к КНФ с примененным
+// отрицанием
+std::optional<Subst> Resolver::resolve(const std::vector<Disjunct> &axioms,
+                                       const std::vector<Disjunct> &target) {
+  std::list<ExtendedDisjunct> extAxioms;
+  std::list<ExtendedDisjunct> extTarget;
+  for (auto &axiom : axioms)
+    extAxioms.push_back({-1, axiom, {}, {-1, -1}});
+  for (auto &tar : target)
+    extTarget.push_back({-1, tar, {}, {-1, -1}});
+  return resolve(std::move(extAxioms), std::move(extTarget));
 }

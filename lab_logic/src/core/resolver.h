@@ -1,34 +1,43 @@
 #pragma once
 
-#include "parser/expr.h"
-#include "substitution.h"
+#include "atom.h"
+#include "disjunct.h"
+#include "subst.h"
+#include "variable.h"
 #include <list>
 #include <optional>
 #include <set>
+#include <vector>
+
+class Subst;
+struct ExtendedDisjunct {
+  int id;
+  Disjunct disjunct;
+  Subst subst;
+  int parent_id[2];
+};
 
 class Resolver {
 public:
-  std::optional<Substitution> unifyTerms(Expr::ptr left, Expr::ptr right,
-                                         bool topLevel = true);
+  std::optional<Subst> unify(const Variable::ptr &left,
+                             const Variable::ptr &right);
 
-  std::optional<Substitution> unifyInversePair(Expr::ptr left, Expr::ptr right);
+  std::optional<Subst> unify(const Atom &left, const Atom &right);
 
-  std::optional<std::pair<Expr::ptr, Substitution>>
-  tryResolve(const std::pair<Expr::ptr, Substitution> &disjunction1,
-             const std::pair<Expr::ptr, Substitution> &disjunction2);
+  std::optional<Disjunct> resolve(const Disjunct &left, const Disjunct &right);
 
-  bool Implies(std::list<Expr::ptr> source, Expr::ptr target);
-  bool Implies(Expr::ptr source, Expr::ptr target);
+  std::optional<ExtendedDisjunct> resolve(const ExtendedDisjunct &left,
+                                          const ExtendedDisjunct &right,
+                                          int nextID);
 
-private:
-  std::list<std::pair<Expr::ptr, Substitution>>
-  disjunctionsTransform(std::list<Expr::ptr> disjunctions,
-                        std::set<std::string> &renamings);
+  void populateIndexes(const std::vector<ExtendedDisjunct> &disjuncts,
+                       std::set<int> &set, int index = -1);
 
-  void PrintState();
+  void printResolutionChain(const std::vector<ExtendedDisjunct> &disjuncts);
 
-  // в логике первого порядка вместе с элементарными конъюнктами нужно держать
-  // подстановку, которая привела к данному конъюнкту
-  std::list<std::pair<Expr::ptr, Substitution>> m_axiomSet;
-  std::list<std::pair<Expr::ptr, Substitution>> m_referenceSet;
+  std::optional<Subst> resolve(std::list<ExtendedDisjunct> axioms,
+                               std::list<ExtendedDisjunct> target);
+
+  std::optional<Subst> resolve(const std::vector<Disjunct> &axioms,
+                               const std::vector<Disjunct> &target);
 };

@@ -2,6 +2,7 @@
 #include "../utils.h"
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -142,6 +143,11 @@ std::string Expr::toString() const {
         first = false;
       }
       res += ")";
+
+      res = value + "(" +
+            toStringSep(operands.begin(), operands.end(), ", ",
+                        mem_ptr_fn(&Expr::toString)) +
+            ")";
     }
     break;
   case Type::inverse:
