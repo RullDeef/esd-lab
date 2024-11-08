@@ -1,7 +1,6 @@
 #include "normalizer.h"
 #include "parser/expr_parser.h"
 #include "resolver_new.h"
-#include <fstream>
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -69,6 +68,23 @@ TEST(SubstTest, conflictingRings) {
   }
 }
 
+TEST(SubstTest, hardCase) {
+  Subst left;
+  left.insert(
+      "x", std::make_shared<Variable>(
+               false, "f", std::vector{std::make_shared<Variable>(true, "y")}));
+  Subst right;
+  right.insert("x", std::make_shared<Variable>(
+                        false, "f",
+                        std::vector{std::make_shared<Variable>(false, "A")}));
+
+  auto sum = left + right;
+  EXPECT_TRUE(sum);
+  if (sum) {
+    std::cout << "got " << sum->toString() << std::endl;
+  }
+}
+
 TEST(DisjunctTest, renameVars) {
   Disjunct disj = parseDisjunct("P(x, y, x3) + Q(f(x1, y), z)");
 
@@ -76,15 +92,15 @@ TEST(DisjunctTest, renameVars) {
   disj.commitVarNames(allocator);
 
   std::cout << "allocated names: " << allocator.toString() << std::endl;
-  Disjunct disj2 = disj.renamedFreeVars(allocator);
+  Disjunct disj2 = disj.renamedVars(allocator);
   std::cout << "allocated after: " << allocator.toString() << std::endl;
 
   EXPECT_EQ(disj2.toString(), "P(x2, y1, x4) + Q(f(x5, y1), z1)");
 }
 
 TEST(ResolverNewTest, unifySimple) {
-  Atom left(false, "P", {std::make_shared<Variable>(false, "x")});
-  Atom right(true, "P", {std::make_shared<Variable>(true, "Ara")});
+  auto left = parseAtom("~R(x)");
+  auto right = parseAtom("R(A)");
 
   auto res = ResolverNew().unify(left, right);
   EXPECT_TRUE(res);

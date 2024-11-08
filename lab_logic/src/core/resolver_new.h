@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <execution>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -163,7 +162,7 @@ public:
         arg->commitVarNames(allocator);
   }
 
-  Variable::ptr renamedFreeVars(NameAllocator &allocator) {
+  Variable::ptr renamedVars(NameAllocator &allocator) {
     // does not work for recursive functions for now!!!
     if (m_isConst)
       return shared_from_this();
@@ -173,7 +172,7 @@ public:
     std::vector<Variable::ptr> arguments;
     std::transform(
         m_arguments.begin(), m_arguments.end(), std::back_inserter(arguments),
-        [&allocator](auto &var) { return var->renamedFreeVars(allocator); });
+        [&allocator](auto &var) { return var->renamedVars(allocator); });
     return std::make_shared<Variable>(false, m_value, std::move(arguments));
   }
 
@@ -198,24 +197,6 @@ public:
     }
     res += ")";
     return res;
-  }
-
-  std::string toStringAddr(const VariableListNode *vlist = nullptr) const {
-    if (hasSelf(vlist))
-      return "...";
-    if (m_arguments.empty())
-      return m_value;
-    VariableListNode next = {this, vlist};
-    std::string res = m_value + "(";
-    bool first = true;
-    for (const auto &arg : m_arguments) {
-      if (!first)
-        res += ", ";
-      first = false;
-      res += arg->toStringAddr(&next);
-    }
-    res += ")";
-    return "[" + std::to_string(((unsigned long)this) % 10000) + "]" + res;
   }
 
 private:
@@ -248,11 +229,11 @@ public:
       var->commitVarNames(allocator);
   }
 
-  Atom renamedFreeVars(NameAllocator &allocator) const {
+  Atom renamedVars(NameAllocator &allocator) const {
     std::vector<Variable::ptr> arguments;
     std::transform(
         m_arguments.begin(), m_arguments.end(), std::back_inserter(arguments),
-        [&allocator](auto &var) { return var->renamedFreeVars(allocator); });
+        [&allocator](auto &var) { return var->renamedVars(allocator); });
     return Atom(m_inverse, m_name, std::move(arguments));
   }
 
@@ -302,11 +283,11 @@ public:
       atom.commitVarNames(allocator);
   }
 
-  Disjunct renamedFreeVars(NameAllocator &allocator) const {
+  Disjunct renamedVars(NameAllocator &allocator) const {
     std::vector<Atom> atoms;
     std::transform(
         m_atoms.begin(), m_atoms.end(), std::back_inserter(atoms),
-        [&allocator](auto &atom) { return atom.renamedFreeVars(allocator); });
+        [&allocator](auto &atom) { return atom.renamedVars(allocator); });
     allocator.commit();
     return Disjunct(std::move(atoms));
   }
@@ -338,19 +319,54 @@ private:
   std::vector<Atom> m_atoms;
 };
 
+class Subst;
+struct ExtendedDisjunct;
+class ResolverNew {
+public:
+  std::optional<Subst> unify(const Variable::ptr &left,
+                             const Variable::ptr &right);
+
+  std::optional<Subst> unify(const Atom &left, const Atom &right);
+
+  std::optional<Disjunct> resolve(const Disjunct &left, const Disjunct &right);
+
+  std::optional<ExtendedDisjunct> resolve(const ExtendedDisjunct &left,
+                                          const ExtendedDisjunct &right,
+                                          int nextID);
+
+  void populateIndexes(const std::vector<ExtendedDisjunct> &disjuncts,
+                       std::set<int> &set, int index = -1);
+
+  void printResolutionChain(const std::vector<ExtendedDisjunct> &disjuncts);
+
+  std::optional<Subst> resolve(std::list<ExtendedDisjunct> axioms,
+                               std::list<ExtendedDisjunct> target);
+
+  std::optional<Subst> resolve(const std::vector<Disjunct> &axioms,
+                               const std::vector<Disjunct> &target);
+};
+
 class Subst {
 public:
   std::optional<Subst> operator+(const Subst &other) const {
-    for (const auto &[var, value] : other.m_pairs)
-      if (m_pairs.count(var) != 0 &&
-          m_pairs.at(var)->toString() != value->toString()) {
-        return std::nullopt;
-      }
+    if (m_pairs.empty() && m_links.empty())
+      return other;
+    if (other.m_pairs.empty() && other.m_links.empty())
+      return *this;
     // start building combined substitution
     Subst newSubst = *this;
-    for (const auto &[var, value] : other.m_pairs)
-      if (!newSubst.insert(var, value))
+    for (const auto &[var, value] : other.m_pairs) {
+      if (m_pairs.count(var) != 0 &&
+          m_pairs.at(var)->toString() != value->toString()) {
+        // попытка унификации двух термов с возможной генерацией новой
+        // подстановки
+        auto auxSubst = ResolverNew().unify(m_pairs.at(var), value);
+        if (!auxSubst) // унификация невозможна - конфликт
+          return std::nullopt;
+        newSubst.insert(var, auxSubst->apply(value));
+      } else if (!newSubst.insert(var, value))
         return std::nullopt;
+    }
     for (const auto &otherRing : other.m_links) {
       bool intersected = false;
       for (auto &ring : newSubst.m_links) {
@@ -420,6 +436,10 @@ public:
     if (term->isVariable()) {
       if (m_pairs.count(term->getValue()) > 0)
         return m_pairs[term->getValue()];
+      // проверяем наличие переменной в связанном кольце неозначенных переменных
+      for (auto &ring : m_links)
+        if (ring.count(term->getValue()) > 0)
+          return std::make_shared<Variable>(false, *ring.begin());
       return term;
     }
     // если term - функциональный символ - выполняем все остальное
@@ -520,197 +540,4 @@ struct ExtendedDisjunct {
   Disjunct disjunct;
   Subst subst;
   int parent_id[2];
-};
-
-class ResolverNew {
-public:
-  std::optional<Subst> unify(const Variable::ptr &left,
-                             const Variable::ptr &right) {
-    if (left->isConst() && right->isConst()) {
-      if (left->getValue() != right->getValue())
-        return std::nullopt;
-      else
-        return std::make_optional<Subst>();
-    }
-    if (left->isVariable() && !right->isVariable()) {
-      Subst res;
-      res.insert(left->getValue(), right);
-      return std::move(res);
-    }
-    if (!left->isVariable() && right->isVariable()) {
-      Subst res;
-      res.insert(right->getValue(), left);
-      return std::move(res);
-    }
-    if (left->isVariable() && right->isVariable()) {
-      Subst res;
-      if (left->getValue() != right->getValue())
-        res.link(left->getValue(), right->getValue());
-      return std::move(res);
-    }
-    // ниже - унификация функциональных символов
-    if (left->getValue() != right->getValue())
-      return std::nullopt;
-    const auto &args1 = left->getArguments();
-    const auto &args2 = right->getArguments();
-    if (args1.size() != args2.size())
-      return std::nullopt;
-    Subst res;
-    for (int i = 0; i < args1.size(); ++i) {
-      auto subst = unify(args1[i], args2[i]);
-      if (!subst)
-        return std::nullopt;
-      subst = res + *subst;
-      if (!subst)
-        return std::nullopt;
-      res = *subst;
-    }
-    return std::move(res);
-  }
-
-  std::optional<Subst> unify(const Atom &left, const Atom &right) {
-    // std::cout << "unify atoms (" << left.toString() << ", " <<
-    // right.toString()
-    //           << ")\n";
-    if (left.getName() != right.getName() ||
-        left.isInverse() == right.isInverse())
-      return std::nullopt;
-    const auto &args1 = left.getArguments();
-    const auto &args2 = right.getArguments();
-    if (args1.size() != args2.size())
-      return std::nullopt;
-    Subst res;
-    for (int i = 0; i < args1.size(); ++i) {
-      // std::cout << "unify(" << args1[i]->toString() << ", "
-      //           << args2[i]->toString() << ") -> ";
-      auto subst = unify(args1[i], args2[i]);
-      // if (!subst)
-      //   std::cout << " no\n";
-      // else
-      //   std::cout << subst->toString() << "\n";
-      if (!subst)
-        return std::nullopt;
-      subst = res + *subst;
-      if (!subst)
-        return std::nullopt;
-      res = *subst;
-      // std::cout << "res = " << res.toString() << "\n";
-    }
-    return std::move(res);
-  }
-
-  std::optional<Disjunct> resolve(const Disjunct &left, const Disjunct &right) {
-    for (int i = 0; i < left.size(); ++i)
-      for (int j = 0; j < right.size(); ++j)
-        if (auto subst = unify(left[i], right[j]))
-          return subst->apply(left.withoutNth(i) + right.withoutNth(j));
-    return std::nullopt;
-  }
-
-  std::optional<ExtendedDisjunct> resolve(const ExtendedDisjunct &left,
-                                          const ExtendedDisjunct &right,
-                                          int nextID) {
-    for (int i = 0; i < left.disjunct.size(); ++i) {
-      for (int j = 0; j < right.disjunct.size(); ++j) {
-        if (auto subst = unify(left.disjunct[i], right.disjunct[j])) {
-          auto disj = subst->apply(left.disjunct.withoutNth(i) +
-                                   right.disjunct.withoutNth(j));
-          return ExtendedDisjunct{nextID, disj, *subst, {left.id, right.id}};
-        }
-      }
-    }
-    return std::nullopt;
-  }
-
-  template <typename T>
-  void populateIndexes(const std::vector<ExtendedDisjunct> &disjuncts, T &set,
-                       int index = -1) {
-    if (index == -1)
-      index = disjuncts.size() - 1;
-    set.insert(index);
-    if (disjuncts[index].parent_id[0] != -1) {
-      populateIndexes(disjuncts, set, disjuncts[index].parent_id[0]);
-      populateIndexes(disjuncts, set, disjuncts[index].parent_id[1]);
-    }
-  }
-
-  void printResolutionChain(const std::vector<ExtendedDisjunct> &disjuncts) {
-    std::set<int> indexSet;
-    populateIndexes(disjuncts, indexSet);
-    std::priority_queue<int, std::vector<int>, std::greater<int>> indexQueue;
-    for (auto index : indexSet)
-      indexQueue.push(index);
-
-    std::map<int, int> renum;
-    for (int index = indexQueue.top(); !indexQueue.empty();
-         indexQueue.pop(), index = indexQueue.top()) {
-      int num = renum.size() + 1;
-      renum[index] = num;
-      if (disjuncts[index].parent_id[0] == -1) {
-        // axiom, used
-        std::cout << num << ") " << disjuncts[index].disjunct.toString()
-                  << std::endl;
-      } else {
-        std::cout << num << ") " << disjuncts[index].disjunct.toString() << " ("
-                  << renum[disjuncts[index].parent_id[0]] << " + "
-                  << renum[disjuncts[index].parent_id[1]] << ") "
-                  << disjuncts[index].subst.toString() << "\n";
-      }
-    }
-  }
-
-  std::optional<Subst> resolve(std::list<ExtendedDisjunct> axioms,
-                               std::list<ExtendedDisjunct> target) {
-    // combine all disjuncts in single vector
-    std::vector<ExtendedDisjunct> disjuncts(target.begin(), target.end());
-    std::copy(axioms.begin(), axioms.end(), std::back_inserter(disjuncts));
-
-    // rename variables
-    NameAllocator allocator;
-    disjuncts.front().disjunct.commitVarNames(allocator);
-    for (int i = 1; i < disjuncts.size(); ++i)
-      disjuncts[i].disjunct = disjuncts[i].disjunct.renamedFreeVars(allocator);
-
-    // reset ids
-    for (int i = 0; i < disjuncts.size(); ++i)
-      disjuncts[i].id = i;
-
-    // combinations loop
-    std::optional<Subst> result;
-    constexpr auto max_iter = 100;
-    for (int right_id = 1;
-         right_id < disjuncts.size() && right_id < max_iter && !result;
-         ++right_id) {
-      for (int left_id = 0; left_id < right_id; ++left_id) {
-        auto res =
-            resolve(disjuncts[left_id], disjuncts[right_id], disjuncts.size());
-        if (!res)
-          continue;
-        res->disjunct = res->disjunct.renamedFreeVars(allocator);
-        disjuncts.push_back(*res);
-        if (res->disjunct.size() == 0) {
-          result = res->subst;
-          break;
-        }
-      }
-    }
-
-    // output resolution steps
-    if (result)
-      printResolutionChain(disjuncts);
-
-    return result;
-  }
-
-  // Алгоритм резолюции цель уже должна быть приведена к КНФ с примененным
-  // отрицанием
-  template <typename T> std::optional<Subst> resolve(T axioms, T target) {
-    std::list<ExtendedDisjunct> extAxioms;
-    std::list<ExtendedDisjunct> extTarget;
-    for (auto &axiom : axioms)
-      extAxioms.push_back({-1, axiom, {}, {-1, -1}});
-    for (auto &tar : target)
-      extTarget.push_back({-1, tar, {}, {-1, -1}});
-    return resolve(std::move(extAxioms), std::move(extTarget));
-  }
 };
