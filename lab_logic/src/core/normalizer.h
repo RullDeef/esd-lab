@@ -57,6 +57,8 @@ private:
     case Expr::Type::forall:
       return quantifierToNormalForm(std::move(expr));
     }
+    throw std::runtime_error("unhandled case expression");
+    return nullptr;
   }
 
   Expr::ptr inverseToNormalForm(Expr::ptr expr) {
@@ -91,6 +93,8 @@ private:
           operands[0]->getVars(),
           Expr::createInverse(operands[0]->getOperands()[0])));
     }
+    throw std::runtime_error("unhandled case expression");
+    return nullptr;
   }
 
   Expr::ptr conjunctionToNormalForm(Expr::ptr expr) {
@@ -275,7 +279,7 @@ private:
     auto exprOps = expr->getOperands();
     if (exprOps.empty()) {
       char firstSym = expr->getValue()[0];
-      bool isConst = !std::isalpha(firstSym) || !std::isupper(firstSym);
+      bool isConst = !std::isalpha(firstSym) || std::isupper(firstSym);
       return std::make_shared<Variable>(isConst, expr->getValue());
     }
     std::vector<Variable::ptr> args;
