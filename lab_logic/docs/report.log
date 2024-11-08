@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2024.2.27)  8 NOV 2024 19:16
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2024.2.27)  8 NOV 2024 23:54
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1528,18 +1528,15 @@ Package pdftex.def Info: unify-term.pdf  used on input line 102.
 (pdftex.def)             Requested size: 483.69687pt x 359.38899pt.
 [11
 
- <./unify-term.pdf>]
+ <./unify-term.pdf>] [12]
 
 pdfTeX warning: pdflatex (file ./uml.pdf): PDF inclusion: found PDF version <1.7>, but at most version <1.5> allowed
-<uml.pdf, id=203, 576.23282pt x 636.45775pt>
+<uml.pdf, id=214, 576.23282pt x 636.45775pt>
 File: uml.pdf Graphic file (type pdf)
 <use uml.pdf>
-Package pdftex.def Info: uml.pdf  used on input line 140.
-(pdftex.def)             Requested size: 386.95897pt x 427.40535pt.
-
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-[12] [13 <./uml.pdf>] [14]
+Package pdftex.def Info: uml.pdf  used on input line 141.
+(pdftex.def)             Requested size: 483.69687pt x 534.26154pt.
+[13 <./uml.pdf>] [14]
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
@@ -1576,15 +1573,15 @@ Package logreq Info: Writing requests to 'report.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 49609 strings out of 474137
- 1081159 string characters out of 5744488
+ 49611 strings out of 474137
+ 1081179 string characters out of 5744488
  2225515 words of memory out of 5000000
  70905 multiletter control sequences out of 15000+600000
- 577761 words of font info for 141 fonts, out of 8000000 for 9000
+ 577834 words of font info for 142 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  126i,19n,129p,1494b,3209s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfbx1440.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfbx1728.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfrm0800.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfrm1200.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfrm1440.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sfti1440.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/cm-super/sftt1440.pfb>
-Output written on report.pdf (17 pages, 491507 bytes).
+Output written on report.pdf (17 pages, 492133 bytes).
 PDF statistics:
  337 PDF objects out of 1000 (max. 8388607)
  277 compressed objects within 3 object streams
