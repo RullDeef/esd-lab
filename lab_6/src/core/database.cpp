@@ -26,8 +26,7 @@ Database::Database(const char *filename) {
     } catch (std::exception &errRule) {
       try {
         auto fact = RuleParser().ParseFact(line.c_str());
-        std::cout << ":- " << fact.toString() << std::endl;
-        m_facts.push_back(std::move(fact));
+        addFact(fact);
       } catch (std::exception &errFact) {
         std::cerr << filename << ":" << lineNumber << ": parse error:\n"
                   << "  if rule: " << errRule.what() << "\n"
@@ -55,7 +54,7 @@ const Atom &Database::getFact(size_t index) const {
   return *iter;
 }
 
-void Database::addRule(const Rule &rule) {
+const Rule &Database::addRule(const Rule &rule) {
   auto inputs = rule.getInputs();
   auto output = rule.getOutput();
   for (size_t i = 0; i < inputs.size(); ++i) {
@@ -72,6 +71,12 @@ void Database::addRule(const Rule &rule) {
   auto newRule = Rule(std::move(inputs), std::move(output));
   std::cout << ":- " << newRule.toString() << std::endl;
   m_rules.push_back(std::move(newRule));
+  return m_rules.back();
+}
+
+void Database::addFact(const Atom &fact) {
+  std::cout << ":- " << fact.toString() << std::endl;
+  m_facts.push_back(fact);
 }
 
 void WorkingDataset::addFact(Atom fact) {

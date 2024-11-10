@@ -1,78 +1,129 @@
 #include "solver.h"
+#include "channel.h"
 #include "database.h"
+#include "subst.h"
 #include <optional>
 
 Solver::Solver(const Database &database) : m_database(database) {}
 
-std::optional<Subst> Solver::solveForward(const Atom &target) {
-  WorkingDataset workset;
-  for (auto &fact : m_database.getFacts()) {
-    // проверить, находится ли цель среди фактов в базе правил
-    Subst subst;
-    if (unify(fact, target, subst))
-      return subst;
-    else
-      workset.addFact(fact);
+Solver::~Solver() {
+  if (m_solverThread.joinable()) {
+    done();
+    m_solverThread.join();
   }
-  bool newAdded = true;
-  while (newAdded) {
-    newAdded = false;
-    workset.nextIteration();
-    for (auto &rule : m_database.getRules()) {
-      // проверить, что входы правила содержат атом из доказанных на предыдущем
-      // шаге
-      bool hasNewFacts = false;
-      for (auto &input : rule.getInputs()) {
-        if (workset.hasNewFactFor(input)) {
-          hasNewFacts = true;
-          break;
+}
+
+void Solver::solveForward(Atom target) {
+  if (m_solverThread.joinable()) {
+    done();
+    m_solverThread.join();
+  }
+  m_channel = std::make_shared<Channel<Subst>>();
+  m_solverThread = std::thread([this, target = std::move(target)]() {
+    WorkingDataset workset;
+    for (auto &fact : m_database.getFacts()) {
+      // проверить, находится ли цель среди фактов в базе правил
+      Subst subst;
+      if (unify(fact, target, subst)) {
+        bool wasEmpty = subst.empty();
+        m_channel->put(std::move(subst));
+        if (wasEmpty) {
+          m_channel->close();
+          return;
         }
       }
-      // пропустить правило, если для него нет новых фактов
-      if (!hasNewFacts)
-        continue;
-      // проверить покрытие входов из доказанных фактов
-      auto subst = unifyInputs(rule, workset);
-      if (!subst)
-        continue;
-      auto newFact = applySubst(*subst, rule.getOutput());
-      // проверить, что новый факт удовлетворяет цели
-      Subst res;
-      if (unify(newFact, target, res))
-        return res;
-      workset.addFact(newFact);
-      newAdded = true;
+      workset.addFact(fact);
     }
-  }
-  return std::nullopt;
+    bool newAdded = true;
+    while (newAdded) {
+      newAdded = false;
+      workset.nextIteration();
+      for (auto &rule : m_database.getRules()) {
+        // проверить, что входы правила содержат атом из доказанных на
+        // предыдущем шаге
+        bool hasNewFacts = false;
+        for (auto &input : rule.getInputs()) {
+          if (workset.hasNewFactFor(input)) {
+            hasNewFacts = true;
+            break;
+          }
+        }
+        // пропустить правило, если для него нет новых фактов
+        if (!hasNewFacts)
+          continue;
+        // std::cout << "looking for rule " << rule.toString() << std::endl;
+        // проверить покрытие входов из доказанных фактов
+        auto channel = unifyInputs(rule, workset);
+        while (true) {
+          auto [subst, ok] = channel->get();
+          if (!ok)
+            break;
+          // std::cout << "got subst: " << subst.toString();
+
+          auto newFact = applySubst(subst, rule.getOutput());
+          // std::cout << rule.toString() << " =>> " << newFact.toString()
+          // << " with " << subst.toString() << std::endl;
+          // проверить, что новый факт удовлетворяет цели
+          Subst res;
+          if (unify(newFact, target, res)) {
+            if (!m_channel->put(std::move(res))) {
+              channel->close();
+              break;
+            }
+          }
+          workset.addFact(newFact);
+          newAdded = true;
+        }
+      }
+    }
+    m_channel->close();
+    return;
+  });
 }
 
-std::optional<Subst> Solver::solveBackward(const Atom &target) {
-  return std::nullopt;
+void Solver::solveBackward(Atom target) { return; }
+
+std::optional<Subst> Solver::next() {
+  if (!m_channel || m_channel->isClosed())
+    return std::nullopt;
+  auto [subst, ok] = m_channel->get();
+  return ok ? std::optional(subst) : std::nullopt;
 }
 
-std::optional<Subst> Solver::unifyInputs(const Rule &rule,
-                                         WorkingDataset &workset) {
-  auto inputs = rule.getInputs();
-  return unifyRest(inputs.begin(), inputs.end(), workset);
+void Solver::done() { m_channel->close(); }
+
+std::shared_ptr<Channel<Subst>> Solver::unifyInputs(const Rule &rule,
+                                                    WorkingDataset &workset) {
+  auto channel = std::make_shared<Channel<Subst>>();
+  std::thread worker([&rule, &workset, channel]() {
+    auto inputs = rule.getInputs();
+    // std::cout << "started unifying inputs for rule " << rule.toString()
+    // << std::endl;
+    unifyRest(inputs.begin(), inputs.end(), workset, Subst(), *channel);
+    // std::cout << "end unification!\n";
+    channel->close();
+  });
+  worker.detach();
+  return channel;
 }
 
-std::optional<Subst> Solver::unifyRest(std::vector<Atom>::const_iterator begin,
-                                       std::vector<Atom>::const_iterator end,
-                                       WorkingDataset &workset) {
+bool Solver::unifyRest(std::vector<Atom>::const_iterator begin,
+                       std::vector<Atom>::const_iterator end,
+                       WorkingDataset &workset, const Subst &prev,
+                       Channel<Subst> &channel, bool wasNewFact) {
   if (begin == end)
-    return Subst();
+    return !wasNewFact || channel.put(prev);
   // проверить все возможные факты для данного атома, если нашли совпадение -
   // проверяем следующие атомы
   auto &curr = *begin++;
   for (const auto &fact : workset.getFacts(curr.getName())) {
-    Subst subst;
+    Subst subst = prev;
     if (unify(curr, fact, subst))
-      if (auto restSubst = unifyRest(begin, end, workset))
-        if ((restSubst = subst + *restSubst))
-          return restSubst;
+      if (!unifyRest(begin, end, workset, subst, channel,
+                     wasNewFact || workset.factIsNew(fact)))
+        return false;
   }
-  return std::nullopt;
+  return true;
 }
 
 bool Solver::unify(const Atom &left, const Atom &right, Subst &subst) {

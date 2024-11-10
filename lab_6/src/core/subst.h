@@ -12,6 +12,8 @@ public:
 
   std::optional<Subst> operator+(const Subst &other) const;
 
+  bool empty() const { return m_pairs.empty(); }
+
   std::string toString() const;
 
 private:

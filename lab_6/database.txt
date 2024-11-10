@@ -10,3 +10,10 @@ Enemy(x, America) -> Hostile(x)
 American(West)
 Enemy(Nono, America)
 
+Less(x, y) & Less(y, z) -> Less(x, z)
+
+Less(3, 4)
+Less(4, 5)
+Less(5, 6)
+Less(6, 7)
+

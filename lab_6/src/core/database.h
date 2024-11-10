@@ -18,7 +18,9 @@ public:
   const std::list<Atom> &getFacts() const;
 
   // добавить правило в базу данных, переименовывая переменные
-  void addRule(const Rule &rule);
+  const Rule &addRule(const Rule &rule);
+
+  void addFact(const Atom &fact);
 
 private:
   std::list<Rule> m_rules;
@@ -43,6 +45,10 @@ public:
   void nextIteration();
 
   bool hasNewFactFor(const Atom &atom) const;
+
+  bool factIsNew(const AtomEx &atom) const {
+    return atom.getGen() + 1 >= m_iteration;
+  }
 
   const std::list<AtomEx> &getFacts(const std::string &name) {
     return m_facts[name];

@@ -34,11 +34,20 @@ int main(int argc, char **argv) {
     auto target = inputTarget(run);
     if (!target)
       continue;
-    auto res = Solver(database).solveForward(*target);
-    if (res)
-      std::cout << res->toString() << std::endl;
-    else
-      std::cout << "not proven" << std::endl;
+    Solver solver(database);
+    solver.solveForward(*target);
+    std::string line;
+    do {
+      auto subst = solver.next();
+      if (!subst) {
+        std::cout << "end" << std::endl;
+        break;
+      } else {
+        std::cout << subst->toString() << std::endl;
+        std::cout << "next?- ";
+        std::getline(std::cin, line);
+      }
+    } while (!line.empty());
   }
   return 0;
 }
