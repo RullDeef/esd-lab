@@ -1,0 +1,16 @@
+# Задача с лекции про пингвинов
+
+# Pinguin(x): х - пингвин
+# Fisher(x):  x ловит рыбу под водой
+# Bird(x):    x - птица
+# CantFly(x): x не умеет летать
+# CanSwim(x): x умеет плавать
+
+Pinguin(x)  -> Fisher(x)
+Pinguin(x1) -> Bird(x1)
+Pinguin(x2) -> CantFly(x2)
+
+Fisher(x) & Bird(x) & CantFly(x) -> CanSwim(x)
+
+Pinguin(Petya)
+

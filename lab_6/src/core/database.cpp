@@ -1,6 +1,7 @@
 #include "database.h"
 #include "name_allocator.h"
 #include "parser.h"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -18,7 +19,7 @@ Database::Database(const char *filename) {
   std::string line;
   while (std::getline(file, line)) {
     lineNumber++;
-    if (line.empty())
+    if (line.empty() || line[0] == '#')
       continue;
     try {
       auto rule = RuleParser().ParseRule(line.c_str());
@@ -83,6 +84,10 @@ void WorkingDataset::addFact(Atom fact) {
   m_facts[fact.getName()].push_back({std::move(fact), m_iteration});
 }
 
+bool WorkingDataset::hasFact(Atom fact) {
+  const auto &factList = m_facts[fact.getName()];
+  return std::find(factList.begin(), factList.end(), fact) != factList.end();
+}
 void WorkingDataset::nextIteration() { m_iteration++; }
 
 bool WorkingDataset::hasNewFactFor(const Atom &atom) const {

@@ -42,6 +42,7 @@ public:
   };
 
   void addFact(Atom fact);
+  bool hasFact(Atom fact);
   void nextIteration();
 
   bool hasNewFactFor(const Atom &atom) const;

@@ -12,6 +12,10 @@ public:
 
   std::string toString() const;
 
+  inline bool operator==(const Atom &other) const {
+    return m_name == other.m_name && m_arguments == other.m_arguments;
+  }
+
 private:
   std::string m_name;
   std::vector<std::string> m_arguments;

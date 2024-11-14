@@ -23,6 +23,8 @@ public:
   void done();
 
 private:
+  void solveForwardThreaded(Atom target, Channel<Subst>& output);
+
   // проверить покрытие входов правила фактами из рабочей памяти. Дополнительно
   // вернуть флаг использования факта полученного на предыдущей итерации
   static std::shared_ptr<Channel<Subst>> unifyInputs(const Rule &rule,
