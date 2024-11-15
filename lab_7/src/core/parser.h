@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rule.h"
+#include "variable.h"
 #include <vector>
 
 /*
@@ -11,7 +12,8 @@
   <rule-prolog> ::= <atom> ':-' <atom-list>
   <atom-list>   ::= <atom> [ (',' | '&') <atom-list> ]
   <atom>        ::= IDENT [ '(' <arg-list> ')' ]
-  <arg-list>    ::= IDENT [ ',' <arg-list> ]
+  <arg-list>    ::= <arg> [ ',' <arg-list> ]
+  <arg>         ::= IDENT [ '(' <arg-list> ')' ]
 */
 
 class RuleParser {
@@ -21,6 +23,7 @@ public:
 private:
   std::vector<Atom> ParseAtomList();
   Atom ParseAtom();
+  Variable::ptr ParseArg();
   std::string ParseIdent();
 
   bool Peek(const char *expected);

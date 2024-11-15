@@ -1,5 +1,7 @@
 #include "parser.h"
+#include "variable.h"
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 
 /*
@@ -55,14 +57,27 @@ Atom RuleParser::ParseAtom() {
   auto name = ParseIdent();
   if (!Eat("("))
     return Atom(std::move(name));
-  std::vector<std::string> arguments;
+  std::vector<Variable::ptr> args;
   do {
-    auto arg = ParseIdent();
-    arguments.push_back(std::move(arg));
+    args.push_back(ParseArg());
   } while (Eat(","));
   if (!Eat(")"))
     RaiseError("')' expected");
-  return Atom(std::move(name), std::move(arguments));
+  return Atom(std::move(name), std::move(args));
+}
+
+Variable::ptr RuleParser::ParseArg() {
+  auto name = ParseIdent();
+  std::vector<Variable::ptr> args;
+  if (Eat("(")) {
+    do {
+      args.push_back(ParseArg());
+    } while (Eat(","));
+    if (!Eat(")"))
+      RaiseError("')' expected");
+  }
+  const bool isConst = !isVar(name) && args.empty();
+  return std::make_shared<Variable>(isConst, std::move(name), std::move(args));
 }
 
 std::string RuleParser::ParseIdent() {

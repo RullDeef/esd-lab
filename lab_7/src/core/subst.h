@@ -1,23 +1,33 @@
 #pragma once
 
+#include "atom.h"
+#include "variable.h"
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 
 class Subst {
 public:
-  bool insert(const std::string &var, std::string value);
-
-  const std::string &apply(const std::string &var) const;
+  bool insert(const std::string &var, Variable::ptr value);
+  bool link(const std::string &var1, const std::string &var2);
 
   std::optional<Subst> operator+(const Subst &other) const;
 
-  bool empty() const { return m_pairs.empty(); }
+  Variable::ptr apply(const Variable::ptr &term);
+  Atom apply(const Atom &atom);
 
   std::string toString() const;
 
+  bool empty() const { return m_pairs.empty(); }
+
 private:
-  std::map<std::string, std::string> m_pairs;
+  bool ringValid(const std::set<std::string> &ring) const;
+  void solveRecursion(Variable::ptr &value, int depth = 0);
+
+private:
+  std::map<std::string, Variable::ptr> m_pairs;
+  std::list<std::set<std::string>> m_links;
 };
 
 namespace std {

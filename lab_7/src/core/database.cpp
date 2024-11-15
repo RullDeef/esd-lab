@@ -1,11 +1,13 @@
 #include "database.h"
 #include "name_allocator.h"
 #include "parser.h"
+#include "variable.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 
 Database::Database(const char *filename) {
   if (filename == nullptr)
@@ -42,23 +44,30 @@ const Rule &Database::getRule(size_t index) const {
 }
 
 const Rule &Database::addRule(const Rule &rule) {
+  std::cout << "adding rule " << rule.toString() << std::endl;
   auto inputs = rule.getInputs();
-  auto output = rule.getOutput();
-  for (size_t i = 0; i < inputs.size(); ++i) {
-    std::vector<std::string> args;
-    for (auto &var : inputs[i].getArguments())
-      args.push_back(isVar(var) ? m_allocator.allocateRenaming(var) : var);
-    inputs[i] = Atom(inputs[i].getName(), std::move(args));
-  }
-  std::vector<std::string> args;
-  for (auto &var : output.getArguments())
-    args.push_back(isVar(var) ? m_allocator.allocateRenaming(var) : var);
+  for (size_t i = 0; i < inputs.size(); ++i)
+    inputs[i] = renameVars(inputs[i]);
+  auto output = renameVars(rule.getOutput());
   m_allocator.commit();
-  output = Atom(output.getName(), std::move(args));
   auto newRule = Rule(std::move(inputs), std::move(output));
   std::cout << ">> " << newRule.toString() << std::endl;
   m_rules.push_back(std::move(newRule));
   return m_rules.back();
+}
+
+Atom Database::renameVars(const Atom &atom) {
+  std::vector<Variable::ptr> args;
+  for (auto &arg : atom.getArguments()) {
+    if (arg->isVariable()) {
+      auto var = std::make_shared<Variable>(
+          false, m_allocator.allocateRenaming(arg->getValue()));
+      args.push_back(var);
+    } else {
+      args.push_back(arg);
+    }
+  }
+  return Atom(atom.getName(), std::move(args));
 }
 
 void WorkingDataset::addFact(Atom fact) {

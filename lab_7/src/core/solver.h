@@ -4,6 +4,7 @@
 #include "channel.h"
 #include "database.h"
 #include "subst.h"
+#include "variable.h"
 #include <optional>
 #include <thread>
 
@@ -22,6 +23,9 @@ public:
   // принудительно остановить поиск новых решений
   void done();
 
+  static bool unify(const Atom &left, const Atom &right, Subst &subst);
+  static bool unify(Variable::ptr left, Variable::ptr right, Subst &subst);
+
 private:
   void solveForwardThreaded(Atom target, Channel<Subst> &output);
   void solveBackwardThreaded(Atom target, Channel<Subst> &output);
@@ -35,10 +39,6 @@ private:
                         std::vector<Atom>::const_iterator end,
                         WorkingDataset &workset, const Subst &prev,
                         Channel<Subst> &channel, bool wasNewFact = false);
-
-  static bool unify(const Atom &left, const Atom &right, Subst &subst);
-
-  static Atom applySubst(const Subst &subst, const Atom &atom);
 
   std::thread m_solverThread;
   std::shared_ptr<Channel<Subst>> m_channel;

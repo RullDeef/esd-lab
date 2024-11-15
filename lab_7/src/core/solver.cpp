@@ -2,7 +2,6 @@
 #include "channel.h"
 #include "database.h"
 #include "subst.h"
-#include <chrono>
 #include <deque>
 #include <iostream>
 #include <iterator>
@@ -83,7 +82,7 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
         auto [subst, ok] = channel->get();
         if (!ok)
           break;
-        auto newFact = applySubst(subst, rule.getOutput());
+        auto newFact = subst.apply(rule.getOutput());
         // проверить, что факт действительно новый
         if (workset.hasFact(newFact))
           continue;
@@ -166,9 +165,9 @@ void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
                       << std::endl;
             Subst filtered;
             for (auto &arg : target.getArguments()) {
-              if (arg != "_" && isVar(arg)) {
+              if (arg->getValue() != "_" && arg->isVariable()) {
                 std::cout << "applying subst to arg " << arg << std::endl;
-                filtered.insert(arg, varsStack.back().apply(arg));
+                filtered.insert(arg->getValue(), varsStack.back().apply(arg));
               }
             }
             if (!output.put(filtered)) {
@@ -181,7 +180,7 @@ void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
           resolventStack.emplace_front(inputs.rbegin(), inputs.rend());
           // применить подстановку к новым подцелям
           for (auto &atom : resolventStack.front())
-            atom = applySubst(subst, atom);
+            atom = subst.apply(atom);
           for (auto &atom : inputs)
             labelStack.push_front(m_database.getRules().begin());
         }
@@ -250,24 +249,31 @@ bool Solver::unify(const Atom &left, const Atom &right, Subst &subst) {
   auto &args2 = right.getArguments();
   if (args1.size() != args2.size())
     return false;
-  for (size_t i = 0; i < args1.size(); ++i) {
-    if (!isVar(args1[i]) && !isVar(args2[i])) {
-      if (args1[i] != args2[i])
-        return false;
-    } else if (isVar(args1[i])) {
-      if (!subst.insert(args1[i], args2[i]))
-        return false;
-    } else {
-      if (!subst.insert(args2[i], args1[i]))
-        return false;
-    }
-  }
+  for (size_t i = 0; i < args1.size(); ++i)
+    if (!unify(args1[i], args2[i], subst))
+      return false;
   return true;
 }
 
-Atom Solver::applySubst(const Subst &subst, const Atom &atom) {
-  auto args = atom.getArguments();
-  for (auto &arg : args)
-    arg = subst.apply(arg);
-  return Atom(atom.getName(), std::move(args));
+bool Solver::unify(Variable::ptr left, Variable::ptr right, Subst &subst) {
+  if (left->isConst() && right->isConst())
+    return left->getValue() == right->getValue();
+  if (left->isVariable() && !right->isVariable())
+    return subst.insert(left->getValue(), right);
+  if (!left->isVariable() && right->isVariable())
+    return subst.insert(right->getValue(), left);
+  if (left->isVariable() && right->isVariable())
+    return left->getValue() == right->getValue() ||
+           subst.link(left->getValue(), right->getValue());
+  // унификация функциональных символов
+  if (left->getValue() != right->getValue())
+    return false;
+  const auto &args1 = left->getArguments();
+  const auto &args2 = right->getArguments();
+  if (args1.size() != args2.size())
+    return false;
+  for (int i = 0; i < args1.size(); ++i)
+    if (!unify(args1[i], args2[i], subst))
+      return false;
+  return true;
 }

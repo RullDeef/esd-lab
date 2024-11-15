@@ -1,6 +1,7 @@
 #include "atom.h"
+#include "variable.h"
 
-Atom::Atom(std::string name, std::vector<std::string> arguments)
+Atom::Atom(std::string name, std::vector<Variable::ptr> arguments)
     : m_name(std::move(name)), m_arguments(std::move(arguments)) {}
 
 std::string Atom::toString() const {
@@ -12,7 +13,7 @@ std::string Atom::toString() const {
       if (!first)
         res += ", ";
       first = false;
-      res += arg;
+      res += arg->toString();
     }
     res += ')';
   }

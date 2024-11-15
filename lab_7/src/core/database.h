@@ -16,8 +16,9 @@ public:
   const Rule &addRule(const Rule &rule);
 
 private:
-  std::list<Rule> m_rules;
+  Atom renameVars(const Atom &atom);
 
+  std::list<Rule> m_rules;
   NameAllocator m_allocator;
 };
 
