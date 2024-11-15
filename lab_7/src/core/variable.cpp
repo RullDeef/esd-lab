@@ -47,6 +47,19 @@ Variable::ptr Variable::renamedVars(NameAllocator &allocator) {
   return std::make_shared<Variable>(false, m_value, std::move(arguments));
 }
 
+void Variable::getAllVarsRecursive(std::set<std::string> &vars,
+                                   const VariableListNode *vlist) const {
+  if (m_isConst || hasSelf(vlist))
+    return;
+  if (m_arguments.empty()) {
+    vars.insert(m_value);
+    return;
+  }
+  VariableListNode next = {this, vlist};
+  for (auto &arg : m_arguments)
+    arg->getAllVarsRecursive(vars, &next);
+}
+
 const std::string &Variable::getValue() const { return m_value; }
 const std::vector<Variable::ptr> Variable::getArguments() const {
   return m_arguments;

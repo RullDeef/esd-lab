@@ -1,0 +1,3 @@
+len(Nil, 0).
+len(cons(_, x), succ(n)) :- len(x, n).
+

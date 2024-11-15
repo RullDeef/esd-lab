@@ -15,7 +15,7 @@ public:
   std::optional<Subst> operator+(const Subst &other) const;
 
   Variable::ptr apply(const Variable::ptr &term);
-  Atom apply(const Atom &atom);
+  Atom apply(Atom atom);
 
   std::string toString() const;
 

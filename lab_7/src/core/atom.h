@@ -1,6 +1,7 @@
 #pragma once
 
 #include "variable.h"
+#include <set>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,8 @@ public:
 
   const std::string &getName() const { return m_name; }
   const std::vector<Variable::ptr> &getArguments() const { return m_arguments; }
+
+  std::set<std::string> getAllVars() const;
 
   std::string toString() const;
 

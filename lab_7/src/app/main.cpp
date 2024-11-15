@@ -1,6 +1,6 @@
 #include "database.h"
+#include "mgraph_solver.h"
 #include "parser.h"
-#include "solver.h"
 #include <iostream>
 #include <optional>
 #include <utility>
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     auto [target, forward] = inputTarget(run);
     if (!target)
       continue;
-    Solver solver(database);
+    MGraphSolver solver(database);
     if (forward)
       solver.solveForward(*target);
     else

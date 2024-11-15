@@ -3,6 +3,7 @@
 
 #include "name_allocator.h"
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,9 @@ public:
   bool hasVars(const VariableListNode *vlist = nullptr) const;
   void commitVarNames(NameAllocator &allocator) const;
   Variable::ptr renamedVars(NameAllocator &allocator);
+
+  void getAllVarsRecursive(std::set<std::string> &vars,
+                           const VariableListNode *vlist = nullptr) const;
 
   const std::string &getValue() const;
   const std::vector<Variable::ptr> getArguments() const;

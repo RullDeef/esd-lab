@@ -44,7 +44,6 @@ const Rule &Database::getRule(size_t index) const {
 }
 
 const Rule &Database::addRule(const Rule &rule) {
-  std::cout << "adding rule " << rule.toString() << std::endl;
   auto inputs = rule.getInputs();
   for (size_t i = 0; i < inputs.size(); ++i)
     inputs[i] = renameVars(inputs[i]);
@@ -58,16 +57,21 @@ const Rule &Database::addRule(const Rule &rule) {
 
 Atom Database::renameVars(const Atom &atom) {
   std::vector<Variable::ptr> args;
-  for (auto &arg : atom.getArguments()) {
-    if (arg->isVariable()) {
-      auto var = std::make_shared<Variable>(
-          false, m_allocator.allocateRenaming(arg->getValue()));
-      args.push_back(var);
-    } else {
-      args.push_back(arg);
-    }
-  }
+  for (auto &arg : atom.getArguments())
+    args.push_back(renameVars(arg));
   return Atom(atom.getName(), std::move(args));
+}
+
+Variable::ptr Database::renameVars(const Variable::ptr &var) {
+  if (var->isConst())
+    return var;
+  if (var->isVariable())
+    return std::make_shared<Variable>(
+        false, m_allocator.allocateRenaming(var->getValue()));
+  std::vector<Variable::ptr> args;
+  for (auto &arg : var->getArguments())
+    args.push_back(renameVars(arg));
+  return std::make_shared<Variable>(false, var->getValue(), std::move(args));
 }
 
 void WorkingDataset::addFact(Atom fact) {

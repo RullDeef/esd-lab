@@ -98,6 +98,8 @@ bool Subst::link(const std::string &var1, const std::string &var2) {
 }
 
 Variable::ptr Subst::apply(const Variable::ptr &term) {
+  if (term == nullptr)
+    return nullptr;
   if (term->isConst())
     return term;
   if (term->isVariable()) {
@@ -119,7 +121,7 @@ Variable::ptr Subst::apply(const Variable::ptr &term) {
   return std::make_shared<Variable>(false, std::move(name), std::move(args));
 }
 
-Atom Subst::apply(const Atom &atom) {
+Atom Subst::apply(Atom atom) {
   std::vector<Variable::ptr> newArgs;
   for (const auto &arg : atom.getArguments())
     newArgs.push_back(apply(arg));

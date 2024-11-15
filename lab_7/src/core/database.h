@@ -2,6 +2,7 @@
 
 #include "name_allocator.h"
 #include "rule.h"
+#include "variable.h"
 #include <list>
 
 class Database {
@@ -17,6 +18,7 @@ public:
 
 private:
   Atom renameVars(const Atom &atom);
+  Variable::ptr renameVars(const Variable::ptr &var);
 
   std::list<Rule> m_rules;
   NameAllocator m_allocator;

@@ -11,7 +11,7 @@
 class Solver {
 public:
   Solver(const Database &database);
-  ~Solver();
+  virtual ~Solver();
 
   void solveForward(Atom target);
   void solveBackward(Atom target);
@@ -26,9 +26,9 @@ public:
   static bool unify(const Atom &left, const Atom &right, Subst &subst);
   static bool unify(Variable::ptr left, Variable::ptr right, Subst &subst);
 
-private:
-  void solveForwardThreaded(Atom target, Channel<Subst> &output);
-  void solveBackwardThreaded(Atom target, Channel<Subst> &output);
+protected:
+  virtual void solveForwardThreaded(Atom target, Channel<Subst> &output);
+  virtual void solveBackwardThreaded(Atom target, Channel<Subst> &output);
 
   // проверить покрытие входов правила фактами из рабочей памяти. Дополнительно
   // вернуть флаг использования факта полученного на предыдущей итерации

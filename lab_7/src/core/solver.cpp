@@ -32,7 +32,7 @@ void Solver::solveBackward(Atom target) {
 }
 
 std::optional<Subst> Solver::next() {
-  if (!m_channel || m_channel->isClosed())
+  if (!m_channel)
     return std::nullopt;
   auto [subst, ok] = m_channel->get();
   return ok ? std::optional(subst) : std::nullopt;
@@ -88,9 +88,10 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
           continue;
         // проверить, что новый факт удовлетворяет цели
         Subst res;
-        if (unify(newFact, target, res))
+        if (unify(newFact, target, res)) {
           if (!output.put(std::move(res)))
             break;
+        }
         workset.addFact(newFact);
         newAdded = true;
       }
@@ -98,118 +99,7 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
   }
 }
 
-void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
-  // стек резольвент
-  std::deque<std::list<Atom>> resolventStack;
-  // стек меток для перебора правил базы знаний
-  std::deque<std::list<Rule>::const_iterator> labelStack;
-  // стек отката
-  std::deque<Atom> backtrackStack;
-  // стек подстановок (переменных)
-  std::deque<Subst> varsStack;
-
-  size_t targetCounter = 1;
-
-  labelStack.push_front(m_database.getRules().begin());
-  resolventStack.push_front(std::list{target});
-  varsStack.push_front({});
-  while (!resolventStack.empty()) {
-    std::cout << "=============================================\n";
-    std::cout << "stacks:\n";
-    std::cout << "  resolvents:\n";
-    for (auto &res : resolventStack) {
-      std::cout << "    {";
-      for (auto &atom : res)
-        std::cout << atom.toString() << ", ";
-      std::cout << "}\n";
-    }
-    std::cout << "  labels:\n";
-    for (auto &label : labelStack)
-      std::cout << "    " << std::distance(m_database.getRules().begin(), label)
-                << std::endl;
-    std::cout << "  backtrack:\n";
-    for (auto &atom : backtrackStack)
-      std::cout << "    " << atom.toString() << std::endl;
-    std::cout << "  substs:\n";
-    for (auto &subst : varsStack)
-      std::cout << "    " << subst.toString() << std::endl;
-    std::cout << std::endl;
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
-    std::list<Atom> &currTargets = resolventStack.front();
-    // если все подцели доказаны - выталкиваем их из стека
-    if (currTargets.empty()) {
-      resolventStack.pop_front();
-      // TODO: update subst and other stacks
-      std::cout << "currTargets empty!\n";
-      continue;
-    }
-    // доказываем текущую подцель
-    const Atom &currTarget = currTargets.back();
-    std::cout << "curr target: " << currTarget.toString() << std::endl;
-    // начинаем поиск правила, которое может доказать текущую подцель
-    auto &ruleLabel = labelStack.front();
-    bool currTargetResolved = false;
-    while (!currTargetResolved && ruleLabel != m_database.getRules().end()) {
-      std::cout << "checking rule " << ruleLabel->toString() << std::endl;
-      Subst subst = varsStack.front();
-      if (unify(currTarget, ruleLabel->getOutput(), subst)) {
-        // переложить атом из верхушки стека резольвенты в стек отката
-        backtrackStack.push_front(currTarget);
-        currTargets.pop_back();
-        varsStack.push_front(subst);
-        targetCounter += ruleLabel->getInputs().size() - 1;
-        // добавить входы правила в стек резольвенты, если есть
-        if (ruleLabel->isFact()) {
-          if (targetCounter == 0) {
-            std::cout << "generating output!: " << subst.toString()
-                      << std::endl;
-            Subst filtered;
-            for (auto &arg : target.getArguments()) {
-              if (arg->getValue() != "_" && arg->isVariable()) {
-                std::cout << "applying subst to arg " << arg << std::endl;
-                filtered.insert(arg->getValue(), varsStack.back().apply(arg));
-              }
-            }
-            if (!output.put(filtered)) {
-              return;
-            }
-            std::cout << "solution posted!\n";
-          }
-        } else {
-          auto &inputs = ruleLabel->getInputs();
-          resolventStack.emplace_front(inputs.rbegin(), inputs.rend());
-          // применить подстановку к новым подцелям
-          for (auto &atom : resolventStack.front())
-            atom = subst.apply(atom);
-          for (auto &atom : inputs)
-            labelStack.push_front(m_database.getRules().begin());
-        }
-        currTargetResolved = true;
-        std::cout << "resolved! " << subst.toString() << std::endl;
-      }
-      ruleLabel++;
-    }
-    if (!currTargetResolved) {
-      // откат
-      if (backtrackStack.empty()) {
-        // доказательство текущей цели невозможно - перебрали все возможные
-        // варианты
-        return;
-      } else {
-        targetCounter++;
-        auto &btrackAtoms = backtrackStack.front();
-        for (auto &atom : resolventStack.front()) {
-          targetCounter--;
-          labelStack.pop_front();
-        }
-        resolventStack.pop_front();
-        varsStack.pop_front();
-        resolventStack.front().push_back(btrackAtoms);
-        backtrackStack.pop_front();
-      }
-    }
-  }
-}
+void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {}
 
 std::shared_ptr<Channel<Subst>> Solver::unifyInputs(const Rule &rule,
                                                     WorkingDataset &workset) {
