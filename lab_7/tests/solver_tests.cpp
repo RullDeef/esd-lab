@@ -198,3 +198,23 @@ TEST(SolverTest, listReverse) {
   ASSERT_TRUE(res);
   ASSERT_EQ(res->toString(), "{x=cons(C, cons(B, cons(A, Nil)))}");
 }
+
+TEST(SolverTest, listProveReversed) {
+  auto database = buildDatabase({
+      "reverse(Nil, Nil) :- cut",
+      "reverse(  x,   y) :- reverse_helper(x, y, Nil)",
+      "reverse_helper(Nil, x, x)",
+      "reverse_helper(cons(h, r), x, y) :- reverse_helper(r, x, cons(h, y))",
+      "test :- reverse(cons(A, cons(B, cons(C, Nil))), cons(C, cons(B, "
+      "cons(A, Nil))))",
+  });
+
+  auto target = RuleParser().ParseRule("test").getOutput();
+  MGraphSolver solver(database);
+  solver.solveBackward(target);
+
+  auto res = solver.next();
+  solver.done();
+
+  ASSERT_TRUE(res);
+}
