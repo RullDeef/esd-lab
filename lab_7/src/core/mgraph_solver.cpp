@@ -7,9 +7,12 @@
 
 static NameAllocator buildAllocator(const Subst &subst) {
   NameAllocator allocator;
+  std::cout << "building allocator {";
   for (auto &name : subst.getAllVarNames()) {
+    std::cout << name << ", ";
     allocator.allocateName(name);
   }
+  std::cout << "}\n";
   return allocator;
 }
 
@@ -27,6 +30,7 @@ void MGraphSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
   generateOr(target, Subst(), *mid);
   while (!output.isClosed()) {
     auto [substEx, ok] = mid->get();
+    std::cout << "GOT SUBST: " << substEx.subst.toString() << std::endl;
     // filter subst to include only relevant variables
     Subst filtered;
     for (auto varName : target.getAllVars())
@@ -41,14 +45,23 @@ void MGraphSolver::generateOr(Atom target, Subst baseSubst,
                               Channel<SubstEx> &output) {
   std::thread worker([this, target = std::move(target),
                       baseSubst = std::move(baseSubst), &output]() {
+    std::cout << "proving " << target.toString() << " with "
+              << baseSubst.toString() << std::endl;
     for (auto &rule : m_database.getRules()) {
       if (output.isClosed()) {
         break;
       }
+      std::cout << "base subst: " << baseSubst.toString() << std::endl;
       Subst subst = baseSubst;
       Rule stdRule = standardize(rule, subst);
-      if (!unify(target, stdRule.getOutput(), subst))
+      std::cout << "target:\n" << target.toString();
+      if (!unify(target, stdRule.getOutput(), subst)) {
+        std::cout << " not unified with\n"
+                  << stdRule.getOutput().toString() << "\n";
         continue;
+      }
+      std::cout << " unified with\n"
+                << stdRule.toString() << " " << subst.toString() << std::endl;
       if (stdRule.isFact()) {
         if (!output.put({subst, false}))
           break;
@@ -70,8 +83,10 @@ void MGraphSolver::generateOr(Atom target, Subst baseSubst,
           return;
         }
       }
-      if (wasCut)
+      if (wasCut) {
+        std::cout << "rule " << target.toString() << " was cut!\n";
         break;
+      }
     }
     output.close();
   });
@@ -92,7 +107,9 @@ void MGraphSolver::generateAnd(std::vector<Atom> targets, Subst baseSubst,
     std::vector<Atom> rest(targets.begin() + 1, targets.end());
     for (auto &atom : rest)
       atom = subst.apply(atom);
+    std::cout << "proving targets " << first.toString() << " and rest\n";
     if (first.toString() == "cut") {
+      std::cout << "cut encountered!\n";
       auto andChan = std::make_shared<Channel<SubstEx>>();
       generateAnd(rest, subst, *andChan);
       while (true) {
