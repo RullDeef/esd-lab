@@ -1,3 +1,11 @@
-len(Nil, 0).
+len(Nil, 0) :- cut.
 len(cons(_, x), succ(n)) :- len(x, n).
+
+reverse(Nil, Nil) :- cut.
+reverse(  x,   y) :- reverse_helper(x, y, Nil).
+
+reverse_helper(Nil, x, x).
+reverse_helper(cons(head, rest), y, x) :- reverse_helper(rest, y, cons(head, x)).
+
+test :- reverse(cons(A, cons(B, cons(C, Nil))), cons(C, cons(B, cons(A, Nil)))).
 

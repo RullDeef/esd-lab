@@ -4,6 +4,7 @@
 #include "solver.h"
 #include <gtest/gtest.h>
 #include <initializer_list>
+#include <memory>
 
 static Database buildDatabase(std::initializer_list<const char *> rules) {
   Database database;
@@ -51,6 +52,25 @@ TEST(SolverTest, sameVarUnify) {
   EXPECT_TRUE(res);
 }
 
+TEST(SolverTest, unifyWithSubst) {
+  Subst subst;
+  subst.link("y", "y2");
+  subst.insert("x3", std::make_shared<Variable>(
+                         false, "cons",
+                         std::vector{
+                             std::make_shared<Variable>(true, "A"),
+                             std::make_shared<Variable>(true, "Nil"),
+                         }));
+  // subst.insert("y", std::make_shared<Variable>(false, "y2"));
+
+  auto left = RuleParser().ParseRule("A(cons(A, Nil), y, Nil)").getOutput();
+  auto right = RuleParser().ParseRule("A(cons(h, r), y3, x5)").getOutput();
+
+  ASSERT_TRUE(Solver::unify(left, right, subst));
+  ASSERT_EQ(subst.toString(),
+            "{y=y2=y3=, h=A, r=Nil, x3=cons(A, Nil), x5=Nil}");
+}
+
 TEST(SolverTest, transitivity) {
   auto database = buildDatabase({
       "Less(x, y) & Less(y, z) -> Less(x, z)",
@@ -70,22 +90,17 @@ TEST(SolverTest, transitivity) {
 }
 
 TEST(SolverTest, backtrackMax3) {
-  GTEST_SKIP();
-
   auto database = buildDatabase({
       "max(a, b, c, a) :- less(b, a), less(c, a)",
-      "max(_, b, c, b) :- less(c, b)",
-      "max(_, _, c, c)",
+      "max(a, b, c, b) :- less(a, b), less(c, b)",
+      "max(a, b, c, c) :- less(a, c), less(b, c)",
       "less(1, 2)",
       "less(2, 3)",
-      "less(3, 4)",
-      "less(4, 5)",
-      "less(5, 6)",
-      "less(6, 7)",
+      "less(1, 3)",
   });
 
   auto target = RuleParser().ParseRule("max(1, 3, 2, x)").getOutput();
-  Solver solver(database);
+  MGraphSolver solver(database);
   solver.solveBackward(target);
 
   auto res = solver.next();
@@ -97,9 +112,9 @@ TEST(SolverTest, backtrackMax3) {
 
 TEST(SolverTest, backtrackMax3AllCombs) {
   auto database = buildDatabase({
-      "max(a, b, c, a) :- less(b, a), less(c, a)",
-      "max(_, b, c, b) :- less(c, b)",
-      "max(_, _, c, c)",
+      "max(a, b, c, a) :- less(b, a), less(c, a), cut",
+      "max(_, b, c, b) :- less(c, b), cut",
+      "max(_, _, c, c) :- cut",
       "less(1, 2)",
       "less(1, 3)",
       "less(2, 3)",
@@ -124,4 +139,62 @@ TEST(SolverTest, backtrackMax3AllCombs) {
   EXPECT_EQ(res2->toString(), "{x=4}");
   ASSERT_TRUE(res3);
   EXPECT_EQ(res3->toString(), "{x=5}");
+}
+
+TEST(SolverTest, listLen) {
+  auto database = buildDatabase({
+      "len(Nil, 0) :- cut",
+      "len(cons(_, x), succ(n)) :- len(x, n)",
+  });
+
+  auto target = RuleParser()
+                    .ParseRule("len(cons(A, cons(B, cons(C, Nil))), x)")
+                    .getOutput();
+  MGraphSolver solver(database);
+  solver.solveBackward(target);
+
+  auto res = solver.next();
+  solver.done();
+
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(), "{x=succ(succ(succ(0)))}");
+}
+
+TEST(SolverTest, listLenReverse) {
+  auto database = buildDatabase({
+      "len(Nil, 0) :- cut",
+      "len(cons(_, x), succ(n)) :- len(x, n)",
+  });
+
+  auto target =
+      RuleParser().ParseRule("len(x, succ(succ(succ(0))))").getOutput();
+  MGraphSolver solver(database);
+  solver.solveBackward(target);
+
+  auto res = solver.next();
+  solver.done();
+
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(), "{x=cons(_, cons(_, cons(_, Nil)))}");
+}
+
+TEST(SolverTest, listReverse) {
+  auto database = buildDatabase({
+      "reverse(Nil, Nil) :- cut",
+      "reverse(  x,   y) :- reverse_helper(x, y, Nil)",
+      "reverse_helper(Nil, x, x)",
+      "reverse_helper(cons(h, r), x, y) :- reverse_helper(r, x, cons(h, y))",
+  });
+
+  auto target = RuleParser()
+                    .ParseRule("reverse(cons(A, cons(B, cons(C, Nil))), x)")
+                    .getOutput();
+  MGraphSolver solver(database);
+  solver.solveBackward(target);
+
+  auto res = solver.next();
+  solver.done();
+
+  ASSERT_TRUE(res);
+  ASSERT_EQ(res->toString(), "{x=cons(C, cons(B, cons(A, Nil)))}");
 }

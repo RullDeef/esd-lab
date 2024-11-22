@@ -12,6 +12,11 @@ public:
     AtomEx() = delete;
   };
 
+  struct SubstEx {
+    Subst subst;
+    bool cut;
+  };
+
   MGraphSolver(const Database &database) : Solver(database) {}
 
 protected:
@@ -19,8 +24,8 @@ protected:
                                      Channel<Subst> &output) override;
 
 private:
-  void generateOr(Atom target, Subst baseSubst, Channel<Subst> &output);
+  void generateOr(Atom target, Subst baseSubst, Channel<SubstEx> &output);
 
   void generateAnd(std::vector<Atom> targets, Subst baseSubst,
-                   Channel<Subst> &output);
+                   Channel<SubstEx> &output);
 };

@@ -4,6 +4,13 @@
 Atom::Atom(std::string name, std::vector<Variable::ptr> arguments)
     : m_name(std::move(name)), m_arguments(std::move(arguments)) {}
 
+Atom Atom::renamedVars(NameAllocator &allocator) const {
+  std::vector<Variable::ptr> args;
+  for (auto arg : m_arguments)
+    args.push_back(arg->renamedVars(allocator));
+  return Atom(m_name, std::move(args));
+}
+
 std::set<std::string> Atom::getAllVars() const {
   std::set<std::string> vars;
   for (auto &arg : m_arguments)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "name_allocator.h"
 #include "variable.h"
 #include <set>
 #include <string>
@@ -12,6 +13,7 @@ public:
   const std::string &getName() const { return m_name; }
   const std::vector<Variable::ptr> &getArguments() const { return m_arguments; }
 
+  Atom renamedVars(NameAllocator &allocator) const;
   std::set<std::string> getAllVars() const;
 
   std::string toString() const;

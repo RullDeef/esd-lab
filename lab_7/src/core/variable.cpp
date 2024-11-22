@@ -69,6 +69,26 @@ void Variable::updateArgument(size_t i, Variable::ptr value) {
   m_arguments[i] = value;
 }
 
+Variable::ptr Variable::clone(std::map<Variable *, Variable::ptr> *varMap) {
+  if (m_isConst || m_arguments.empty())
+    return shared_from_this(); // safe omit clone
+  std::vector<Variable::ptr> args;
+  if (varMap == nullptr) {
+    std::map<Variable *, Variable::ptr> defaultVarMap;
+    for (auto &arg : m_arguments)
+      args.push_back(arg->clone(&defaultVarMap));
+  } else {
+    if (varMap->count(this) != 0)
+      return varMap->at(this);
+    for (auto &arg : m_arguments)
+      args.push_back(arg->clone(varMap));
+  }
+  auto res = std::make_shared<Variable>(m_isConst, m_value, std::move(args));
+  if (varMap != nullptr)
+    (*varMap)[this] = res;
+  return res;
+}
+
 std::string Variable::toString() const { return toString(nullptr); }
 
 std::string Variable::toString(const VariableListNode *vlist) const {

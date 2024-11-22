@@ -9,6 +9,9 @@
 
 class Subst {
 public:
+  Subst() = default;
+  Subst(const Subst &other);
+
   bool insert(const std::string &var, Variable::ptr value);
   bool link(const std::string &var1, const std::string &var2);
 
@@ -20,6 +23,11 @@ public:
   std::string toString() const;
 
   bool empty() const { return m_pairs.empty(); }
+
+  // get shallow var names
+  std::set<std::string> getVarNames() const;
+  // get full recursive var names
+  std::set<std::string> getAllVarNames() const;
 
 private:
   bool ringValid(const std::set<std::string> &ring) const;

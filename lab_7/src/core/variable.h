@@ -42,6 +42,8 @@ public:
 
   void updateArgument(size_t i, Variable::ptr value);
 
+  Variable::ptr clone(std::map<Variable *, Variable::ptr> *varMap = nullptr);
+
   std::string toString() const;
 
 private:

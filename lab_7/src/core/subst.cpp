@@ -1,6 +1,7 @@
 #include "subst.h"
 #include "solver.h"
 #include <algorithm>
+#include <vector>
 
 template <typename T>
 static bool set_overlaps(const std::set<T> &set1, const std::set<T> &set2) {
@@ -8,6 +9,11 @@ static bool set_overlaps(const std::set<T> &set1, const std::set<T> &set2) {
   std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(),
                         std::inserter(ref, ref.end()), std::less());
   return !ref.empty();
+}
+
+Subst::Subst(const Subst &other) : m_links(other.m_links) {
+  for (auto &[name, value] : other.m_pairs)
+    insert(name, value->clone());
 }
 
 std::optional<Subst> Subst::operator+(const Subst &other) const {
@@ -66,6 +72,8 @@ bool Subst::insert(const std::string &var, Variable::ptr value) {
     if (ring.count(var) > 0)
       for (const auto &linkedVar : ring)
         m_pairs[linkedVar] = value;
+  for (auto &[varName, varValue] : m_pairs)
+    solveRecursion(varValue);
   return true;
 }
 
@@ -76,7 +84,8 @@ bool Subst::link(const std::string &var1, const std::string &var2) {
     if (m_pairs.at(var1) != m_pairs.at(var2))
       return false;
   }
-  for (auto ring : m_links) {
+  // linking two rings is not supported here
+  for (auto &ring : m_links) {
     if (ring.count(var1) > 0) {
       ring.insert(var2);
       if (m_pairs.count(var1) > 0)
@@ -153,6 +162,26 @@ std::string Subst::toString() const {
   }
   res += "}";
   return res;
+}
+
+std::set<std::string> Subst::getVarNames() const {
+  std::set<std::string> names;
+  for (auto &ring : m_links)
+    names.insert(ring.begin(), ring.end());
+  for (auto &[name, value] : m_pairs)
+    names.insert(name);
+  return names;
+}
+
+std::set<std::string> Subst::getAllVarNames() const {
+  std::set<std::string> names;
+  for (auto &ring : m_links)
+    names.insert(ring.begin(), ring.end());
+  for (auto &[name, value] : m_pairs) {
+    names.insert(name);
+    value->getAllVarsRecursive(names);
+  }
+  return names;
 }
 
 bool Subst::ringValid(const std::set<std::string> &ring) const {
