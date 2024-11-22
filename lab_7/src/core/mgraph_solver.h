@@ -2,6 +2,7 @@
 
 #include "channel.h"
 #include "database.h"
+#include "name_allocator.h"
 #include "solver.h"
 
 class MGraphSolver : public Solver {
@@ -24,8 +25,9 @@ protected:
                                      Channel<Subst> &output) override;
 
 private:
-  void generateOr(Atom target, Subst baseSubst, Channel<SubstEx> &output);
+  void generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
+                  Channel<SubstEx> &output);
 
   void generateAnd(std::vector<Atom> targets, Subst baseSubst,
-                   Channel<SubstEx> &output);
+                   NameAllocator allocator, Channel<SubstEx> &output);
 };
