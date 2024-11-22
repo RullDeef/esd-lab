@@ -5,12 +5,24 @@
 #include <optional>
 #include <utility>
 
-std::pair<std::optional<Atom>, bool> inputTarget(bool &run) {
+std::pair<std::optional<Atom>, bool> inputTarget(bool &run,
+                                                 Database &database) {
   std::cout << "?- ";
   std::string line;
   if (!std::getline(std::cin, line)) {
     run = false;
     return std::make_pair(std::nullopt, false);
+  }
+  if (!line.empty() && line[0] == '+') {
+    // insert mode - add new rule to database
+    try {
+      auto rule = RuleParser().ParseRule(line.c_str() + 1);
+      database.addRule(rule);
+    } catch (std::exception &err) {
+      std::cerr << "parse error: " << err.what() << std::endl;
+      return std::make_pair(std::nullopt, false);
+    }
+    return inputTarget(run, database);
   }
   const auto forward = line.empty() || line[0] != '!';
   try {
@@ -39,7 +51,7 @@ int main(int argc, char **argv) {
   // start repl
   bool run = true;
   while (run) {
-    auto [target, forward] = inputTarget(run);
+    auto [target, forward] = inputTarget(run, database);
     if (!target)
       continue;
     MGraphSolver solver(database);
