@@ -65,16 +65,7 @@ private:
 // unbuffered channel
 template <typename T> class Channel {
 public:
-  ~Channel() {
-    std::unique_lock lock(m_mutex);
-    m_closed = true;
-    if (m_getWaiting > 0 || m_putWaiting > 0) {
-      m_condGet.notify_all();
-      m_condPut.notify_all();
-      m_condPut.wait(
-          lock, [this]() { return m_getWaiting == 0 && m_putWaiting == 0; });
-    }
-  }
+  ~Channel() { close(); }
 
   bool isClosed() {
     std::unique_lock lock(m_mutex);
@@ -84,8 +75,7 @@ public:
   void close() {
     std::unique_lock lock(m_mutex);
     m_closed = true;
-    m_condGet.notify_all();
-    m_condPut.notify_all();
+    m_cond.notify_all();
   }
 
   size_t getCapacity() const { return 0; }
@@ -94,22 +84,14 @@ public:
     std::unique_lock lock(m_mutex);
     if (m_closed)
       return {T(), false};
-    if (m_getWaiting > 0) {
-      m_condPut.wait(lock, [this]() { return m_closed || m_getWaiting == 0; });
+    if (!m_hasValue) {
+      m_cond.wait(lock, [this]() { return m_closed || m_hasValue; });
       if (m_closed)
         return {T(), false};
     }
-    m_getWaiting++;
-    if (m_putWaiting == 0) {
-      m_condGet.wait(lock);
-    }
-    if (m_closed) {
-      m_getWaiting--;
-      return {T(), false};
-    }
     T object = std::move(m_buffer);
-    m_condPut.notify_all();
-    m_getWaiting--;
+    m_hasValue = false;
+    m_cond.notify_all();
     return {object, true};
   }
 
@@ -117,25 +99,21 @@ public:
     std::unique_lock lock(m_mutex);
     if (m_closed)
       return false;
-    if (m_putWaiting > 0)
-      m_condPut.wait(lock, [this]() { return m_closed || m_putWaiting == 0; });
+    if (m_hasValue)
+      m_cond.wait(lock, [this]() { return m_closed || !m_hasValue; });
     if (m_closed)
       return false;
-    m_putWaiting++;
     m_buffer = std::move(object);
-    sleep(1);
-    m_condGet.notify_one();
-    m_condPut.wait(lock);
-    m_putWaiting--;
-    return true;
+    m_hasValue = true;
+    m_cond.notify_one();
+    m_cond.wait(lock, [this]() { return m_closed || !m_hasValue; });
+    return !m_closed;
   }
 
 private:
   bool m_closed = false;
   T m_buffer;
+  bool m_hasValue = false;
   std::mutex m_mutex;
-  std::condition_variable m_condGet;
-  std::condition_variable m_condPut;
-  int m_putWaiting = 0;
-  int m_getWaiting = 0;
+  std::condition_variable m_cond;
 };

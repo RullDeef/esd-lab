@@ -33,7 +33,7 @@ protected:
 
   // проверить покрытие входов правила фактами из рабочей памяти. Дополнительно
   // вернуть флаг использования факта полученного на предыдущей итерации
-  static std::pair<std::thread, std::shared_ptr<Channel<Subst>>>
+  static std::pair<std::jthread, std::shared_ptr<Channel<Subst>>>
   unifyInputs(const Rule &rule, WorkingDataset &workset);
 
   static bool unifyRest(std::vector<Atom>::const_iterator begin,

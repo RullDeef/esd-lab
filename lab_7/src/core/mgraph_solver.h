@@ -27,9 +27,9 @@ protected:
                                      Channel<Subst> &output) override;
 
 private:
-  std::thread generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
-                         Channel<SubstEx> &output);
+  std::jthread generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
+                          Channel<SubstEx> &output);
 
-  std::thread generateAnd(std::vector<Atom> targets, Subst baseSubst,
-                          NameAllocator allocator, Channel<SubstEx> &output);
+  std::jthread generateAnd(std::vector<Atom> targets, Subst baseSubst,
+                           NameAllocator allocator, Channel<SubstEx> &output);
 };

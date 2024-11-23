@@ -103,8 +103,6 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
           if (!output.put(std::move(res))) {
             std::cout << "closed!\n";
             channel->close();
-            if (worker.joinable())
-              worker.join();
             return;
           }
           std::cout << "ok!\n";
@@ -114,8 +112,6 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
       }
       std::cout << "new fact: " << newAdded << std::endl;
       channel->close();
-      if (worker.joinable())
-        worker.join();
     }
     std::cout << "new fact added: " << newAdded << "\n";
   }
@@ -124,10 +120,10 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
 
 void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {}
 
-std::pair<std::thread, std::shared_ptr<Channel<Subst>>>
+std::pair<std::jthread, std::shared_ptr<Channel<Subst>>>
 Solver::unifyInputs(const Rule &rule, WorkingDataset &workset) {
   auto channel = std::make_shared<Channel<Subst>>();
-  std::thread worker([&rule, &workset, channel]() {
+  std::jthread worker([&rule, &workset, channel]() {
     auto inputs = rule.getInputs();
     std::cout << "unifying inputs for " << rule.toString() << std::endl;
     unifyRest(inputs.begin(), inputs.end(), workset, Subst(), *channel);

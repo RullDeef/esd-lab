@@ -35,6 +35,34 @@ TEST(ChannelTest, unbufferedStress) {
   EXPECT_FALSE(ok);
 }
 
+TEST(ChannelTest, unbufferedMultiPut) {
+  Channel<int> chan;
+
+  std::atomic<int> sum = 0;
+
+  std::vector<std::future<void>> futurePuts;
+  for (int i = 0; i < 10; ++i) {
+    futurePuts.emplace_back(std::async(std::launch::async, [&chan]() {
+      for (int i = 0; i < 100; ++i)
+        EXPECT_TRUE(chan.put(i));
+    }));
+  }
+
+  auto futureGet = std::async(std::launch::async, [&chan, &sum]() {
+    for (int i = 0; i < 1000; ++i) {
+      auto [val, ok] = chan.get();
+      EXPECT_TRUE(ok);
+      sum += val;
+    }
+  });
+
+  for (auto &fut : futurePuts)
+    fut.wait();
+  chan.close();
+  futureGet.wait();
+  EXPECT_EQ(sum, 10 * (0 + 99) * 100 / 2);
+}
+
 TEST(ChannelTest, buffered) {
   ChannelBuf<int> chan(1);
 

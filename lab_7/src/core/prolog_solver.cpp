@@ -8,7 +8,7 @@ void PrologSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
   auto dbStart = m_database->getRules().begin();
 
   m_resolventStack.clear();
-  m_resolventStack.push_front({{target, dbStart}});
+  // m_resolventStack.push_front({{target, dbStart}});
   m_backtrackStack.clear();
   m_backtrackStack.push_front({});
   m_varsStack.clear();
@@ -68,8 +68,8 @@ void PrologSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
         } else {
           m_resolventStack.push_front({});
           for (auto input : currTarget->label->getInputs()) {
-            m_resolventStack.front().push_front(
-                {subst.apply(input), m_database->getRules().begin()});
+            // m_resolventStack.front().push_front(
+            //     {subst.apply(input), m_database->getRules().begin()});
           }
         }
         currTargetResolved = true;

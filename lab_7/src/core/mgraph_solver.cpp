@@ -45,16 +45,14 @@ void MGraphSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
     }
   }
   mid->close();
-  if (worker.joinable())
-    worker.join();
 }
 
-std::thread MGraphSolver::generateOr(Atom target, Subst baseSubst,
-                                     NameAllocator allocator,
-                                     Channel<SubstEx> &output) {
-  std::thread worker([this, target = std::move(target),
-                      baseSubst = std::move(baseSubst),
-                      allocator = std::move(allocator), &output]() {
+std::jthread MGraphSolver::generateOr(Atom target, Subst baseSubst,
+                                      NameAllocator allocator,
+                                      Channel<SubstEx> &output) {
+  std::jthread worker([this, target = std::move(target),
+                       baseSubst = std::move(baseSubst),
+                       allocator = std::move(allocator), &output]() {
     std::cout << "proving " << target.toString() << " with "
               << baseSubst.toString() << std::endl;
     for (auto &rule : m_database->getRules()) {
@@ -93,8 +91,6 @@ std::thread MGraphSolver::generateOr(Atom target, Subst baseSubst,
         wasCut = wasCut || subst2.cut;
         if (!output.put({std::move(subst2.subst), false})) {
           mid->close();
-          if (worker.joinable())
-            worker.join();
           return;
         }
       }
@@ -103,20 +99,18 @@ std::thread MGraphSolver::generateOr(Atom target, Subst baseSubst,
         break;
       }
       mid->close();
-      if (worker.joinable())
-        worker.join();
     }
     output.close();
   });
   return worker;
 }
 
-std::thread MGraphSolver::generateAnd(std::vector<Atom> targets,
-                                      Subst baseSubst, NameAllocator allocator,
-                                      Channel<SubstEx> &output) {
-  std::thread worker([this, targets = std::move(targets),
-                      baseSubst = std::move(baseSubst),
-                      allocator = std::move(allocator), &output]() {
+std::jthread MGraphSolver::generateAnd(std::vector<Atom> targets,
+                                       Subst baseSubst, NameAllocator allocator,
+                                       Channel<SubstEx> &output) {
+  std::jthread worker([this, targets = std::move(targets),
+                       baseSubst = std::move(baseSubst),
+                       allocator = std::move(allocator), &output]() {
     if (targets.empty()) {
       output.put({baseSubst, false});
       output.close();
@@ -140,13 +134,9 @@ std::thread MGraphSolver::generateAnd(std::vector<Atom> targets,
           break;
         if (!output.put({std::move(substEx2.subst), true})) {
           andChan->close();
-          if (worker.joinable())
-            worker.join();
           return;
         }
       }
-      if (worker.joinable())
-        worker.join();
     } else {
       auto orChan = std::make_shared<Channel<SubstEx>>();
       auto orWorker =
@@ -166,21 +156,13 @@ std::thread MGraphSolver::generateAnd(std::vector<Atom> targets,
             break;
           if (!output.put({std::move(substEx2.subst), false})) {
             andChan->close();
-            if (andWorker.joinable())
-              andWorker.join();
             orChan->close();
-            if (orWorker.joinable())
-              orWorker.join();
             return;
           }
         }
         andChan->close();
-        if (andWorker.joinable())
-          andWorker.join();
       }
       orChan->close();
-      if (orWorker.joinable())
-        orWorker.join();
     }
     output.close();
   });
