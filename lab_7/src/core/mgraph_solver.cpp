@@ -46,8 +46,8 @@ void MGraphSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
     // filter subst to include only relevant variables
     Subst filtered;
     for (auto varName : target.getAllVars())
-      filtered.insert(varName, substEx.subst.apply(
-                                   std::make_shared<Variable>(false, varName)));
+      filtered.insert(varName,
+                      substEx.subst.apply(Variable::createVariable(varName)));
     if (!output.put(std::move(filtered)))
       break;
   }

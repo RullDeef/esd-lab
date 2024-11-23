@@ -66,12 +66,12 @@ Variable::ptr Database::renameVars(const Variable::ptr &var) {
   if (var->isConst())
     return var;
   if (var->isVariable())
-    return std::make_shared<Variable>(
-        false, m_allocator.allocateRenaming(var->getValue()));
+    return Variable::createVariable(
+        m_allocator.allocateRenaming(var->getValue()));
   std::vector<Variable::ptr> args;
   for (auto &arg : var->getArguments())
     args.push_back(renameVars(arg));
-  return std::make_shared<Variable>(false, var->getValue(), std::move(args));
+  return Variable::createFuncSym(var->getValue(), std::move(args));
 }
 
 void WorkingDataset::addFact(Atom fact) {

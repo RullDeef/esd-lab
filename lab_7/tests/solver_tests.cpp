@@ -58,13 +58,11 @@ TEST(SolverTest, sameVarUnify) {
 TEST(SolverTest, unifyWithSubst) {
   Subst subst;
   subst.link("y", "y2");
-  subst.insert("x3", std::make_shared<Variable>(
-                         false, "cons",
-                         std::vector{
-                             std::make_shared<Variable>(true, "A"),
-                             std::make_shared<Variable>(true, "Nil"),
-                         }));
-  // subst.insert("y", std::make_shared<Variable>(false, "y2"));
+  subst.insert("x3",
+               Variable::createFuncSym("cons", std::vector{
+                                                   Variable::createConst("A"),
+                                                   Variable::createConst("Nil"),
+                                               }));
 
   auto left = RuleParser().ParseRule("A(cons(A, Nil), y, Nil)").getOutput();
   auto right = RuleParser().ParseRule("A(cons(h, r), y3, x5)").getOutput();

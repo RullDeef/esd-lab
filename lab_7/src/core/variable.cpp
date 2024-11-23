@@ -3,10 +3,30 @@
 #include <algorithm>
 #include <memory>
 
-Variable::Variable(bool isConst, std::string value,
+Variable::Variable(bool isConst, bool isQuoted, std::string value,
                    std::vector<Variable::ptr> arguments)
-    : m_isConst(isConst), m_value(std::move(value)),
+    : m_isConst(isConst), m_isQuoted(isQuoted), m_value(std::move(value)),
       m_arguments(std::move(arguments)) {}
+
+Variable::ptr Variable::createConst(std::string value) {
+  return std::make_shared<Variable>(true, false, std::move(value),
+                                    std::vector<ptr>{});
+}
+
+Variable::ptr Variable::createString(std::string value) {
+  return std::make_shared<Variable>(true, true, std::move(value),
+                                    std::vector<ptr>{});
+}
+
+Variable::ptr Variable::createVariable(std::string name) {
+  return std::make_shared<Variable>(false, false, std::move(name),
+                                    std::vector<ptr>{});
+}
+
+Variable::ptr Variable::createFuncSym(std::string name, std::vector<ptr> args) {
+  return std::make_shared<Variable>(false, false, std::move(name),
+                                    std::move(args));
+}
 
 bool Variable::isConst() const { return m_isConst; }
 bool Variable::isVariable() const { return !m_isConst && m_arguments.empty(); }
@@ -39,13 +59,12 @@ Variable::ptr Variable::renamedVars(NameAllocator &allocator) {
   if (m_isConst)
     return shared_from_this();
   if (m_arguments.empty())
-    return std::make_shared<Variable>(false,
-                                      allocator.allocateRenaming(m_value));
+    return createVariable(allocator.allocateRenaming(m_value));
   std::vector<Variable::ptr> arguments;
   std::transform(
       m_arguments.begin(), m_arguments.end(), std::back_inserter(arguments),
       [&allocator](auto &var) { return var->renamedVars(allocator); });
-  return std::make_shared<Variable>(false, m_value, std::move(arguments));
+  return createFuncSym(m_value, std::move(arguments));
 }
 
 void Variable::getAllVarsRecursive(std::set<std::string> &vars,
@@ -66,17 +85,14 @@ const std::vector<Variable::ptr> Variable::getArguments() const {
   return m_arguments;
 }
 
-void Variable::updateArgument(size_t i, Variable::ptr value) {
-  m_arguments[i] = value;
-}
+void Variable::updateArgument(size_t i, ptr value) { m_arguments[i] = value; }
 
-Variable::ptr Variable::clone(std::map<Variable *, Variable::ptr> *varMap) {
+Variable::ptr Variable::clone(std::map<Variable *, ptr> *varMap) {
   if (m_isConst || m_arguments.empty())
     return shared_from_this(); // safe omit clone
   if (varMap == nullptr) {
-    std::map<Variable *, Variable::ptr> defaultVarMap;
-    defaultVarMap[this] =
-        std::make_shared<Variable>(m_isConst, m_value, m_arguments);
+    std::map<Variable *, ptr> defaultVarMap;
+    defaultVarMap[this] = std::make_shared<Variable>(*this);
     for (int i = 0; i < m_arguments.size(); ++i)
       defaultVarMap[this]->updateArgument(
           i, m_arguments[i]->clone(&defaultVarMap));
@@ -84,8 +100,7 @@ Variable::ptr Variable::clone(std::map<Variable *, Variable::ptr> *varMap) {
   } else {
     if (varMap->count(this) != 0)
       return varMap->at(this);
-    (*varMap)[this] =
-        std::make_shared<Variable>(m_isConst, m_value, m_arguments);
+    (*varMap)[this] = std::make_shared<Variable>(*this);
     for (size_t i = 0; i < m_arguments.size(); ++i)
       (*varMap)[this]->updateArgument(i, m_arguments[i]->clone(varMap));
     return (*varMap)[this];
@@ -98,7 +113,7 @@ std::string Variable::toString(const VariableListNode *vlist) const {
   if (hasSelf(vlist))
     return "...";
   if (m_arguments.empty())
-    return m_value;
+    return m_isQuoted ? '\"' + m_value + '\"' : m_value;
   VariableListNode next = {this, vlist};
   std::string res = m_value;
   if (!m_arguments.empty()) {

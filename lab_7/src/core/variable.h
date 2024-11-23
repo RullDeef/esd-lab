@@ -23,8 +23,13 @@ class Variable : public std::enable_shared_from_this<Variable> {
 public:
   using ptr = std::shared_ptr<Variable>;
 
-  Variable(bool isConst, std::string value,
-           std::vector<Variable::ptr> arguments = {});
+  Variable(bool isConst, bool isQuoted, std::string value,
+           std::vector<Variable::ptr> arguments);
+
+  static ptr createConst(std::string value);
+  static ptr createString(std::string value);
+  static ptr createVariable(std::string name);
+  static ptr createFuncSym(std::string name, std::vector<ptr> args);
 
   bool isConst() const;
   bool isVariable() const;
@@ -52,6 +57,7 @@ private:
   bool hasSelf(const VariableListNode *list) const;
 
   bool m_isConst;
+  bool m_isQuoted;
   std::string m_value;
   std::vector<Variable::ptr> m_arguments;
 };

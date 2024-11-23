@@ -67,6 +67,9 @@ Atom RuleParser::ParseAtom() {
 }
 
 Variable::ptr RuleParser::ParseArg() {
+  SkipWhitespace();
+  if (Peek("\""))
+    return Variable::createString(ParseString());
   auto name = ParseIdent();
   std::vector<Variable::ptr> args;
   if (Eat("(")) {
@@ -76,8 +79,34 @@ Variable::ptr RuleParser::ParseArg() {
     if (!Eat(")"))
       RaiseError("')' expected");
   }
-  const bool isConst = !isVar(name) && args.empty();
-  return std::make_shared<Variable>(isConst, std::move(name), std::move(args));
+  if (!args.empty())
+    return Variable::createFuncSym(std::move(name), std::move(args));
+  else if (isVar(name))
+    return Variable::createVariable(std::move(name));
+  else
+    return Variable::createConst(std::move(name));
+}
+
+std::string RuleParser::ParseString() {
+  SkipWhitespace();
+  if (!Eat("\""))
+    RaiseError("string expected");
+  std::string res;
+  size_t size = 0;
+  while (m_source[m_pos + size] && m_source[m_pos + size] != '"') {
+    if (m_source[m_pos + size] == '\\') {
+      size++;
+      if (!m_source[m_pos + size])
+        RaiseError("unexpected end of string");
+    }
+    res += m_source[m_pos + size];
+    size++;
+  }
+  if (m_source[m_pos + size] != '"')
+    RaiseError("end of string '\"' expected");
+  size++;
+  m_pos += size;
+  return res;
 }
 
 std::string RuleParser::ParseIdent() {
@@ -88,9 +117,9 @@ std::string RuleParser::ParseIdent() {
     size++;
   if (size == 0)
     RaiseError("identifier expected");
-  auto name = std::string(m_source + m_pos, m_source + m_pos + size);
+  std::string name(m_source + m_pos, m_source + m_pos + size);
   m_pos += size;
-  return std::move(name);
+  return name;
 }
 
 bool RuleParser::Peek(const char *expected) {

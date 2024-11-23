@@ -13,7 +13,7 @@
   <atom-list>   ::= <atom> [ (',' | '&') <atom-list> ]
   <atom>        ::= IDENT [ '(' <arg-list> ')' ]
   <arg-list>    ::= <arg> [ ',' <arg-list> ]
-  <arg>         ::= IDENT [ '(' <arg-list> ')' ]
+  <arg>         ::= STRING | IDENT [ '(' <arg-list> ')' ]
 */
 
 class RuleParser {
@@ -24,6 +24,8 @@ private:
   std::vector<Atom> ParseAtomList();
   Atom ParseAtom();
   Variable::ptr ParseArg();
+
+  std::string ParseString();
   std::string ParseIdent();
 
   bool Peek(const char *expected);

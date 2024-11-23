@@ -117,7 +117,7 @@ Variable::ptr Subst::apply(const Variable::ptr &term) {
     // проверяем наличие переменной в связанном кольце неозначенных переменных
     for (auto &ring : m_links)
       if (ring.count(term->getValue()) > 0)
-        return std::make_shared<Variable>(false, *ring.begin());
+        return Variable::createVariable(*ring.begin());
     return term;
   }
   // если term - функциональный символ - выполняем все остальное
@@ -127,7 +127,7 @@ Variable::ptr Subst::apply(const Variable::ptr &term) {
   std::vector<Variable::ptr> args;
   for (auto arg : term->getArguments())
     args.push_back(apply(arg));
-  return std::make_shared<Variable>(false, std::move(name), std::move(args));
+  return Variable::createFuncSym(std::move(name), std::move(args));
 }
 
 Atom Subst::apply(Atom atom) {
