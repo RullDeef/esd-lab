@@ -3,12 +3,27 @@
 #include "name_allocator.h"
 #include "solver.h"
 #include "subst.h"
+#include "variable.h"
 #include <memory>
 #include <thread>
+#include <utility>
 
-static void saturateAllocator(NameAllocator &allocator, const Subst &subst) {
-  for (auto &name : subst.getAllVarNames())
-    allocator.allocateName(name);
+static TaskChanPair<MGraphSolver::SubstEx>
+taskChanPairEx(TaskChanPair<Subst> &&tcp) {
+  auto chan = std::make_shared<Channel<MGraphSolver::SubstEx>>();
+  std::jthread worker([tcp = std::move(tcp), chan]() {
+    while (true) {
+      auto [subst, ok] = tcp.second->get();
+      if (!ok) {
+        chan->close();
+        break;
+      }
+      if (!chan->put({std::move(subst), false}))
+        break;
+    }
+    tcp.second->close();
+  });
+  return std::make_pair(std::move(worker), std::move(chan));
 }
 
 static Rule standardize(const Rule &rule, NameAllocator &allocator) {
@@ -42,6 +57,18 @@ void MGraphSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
 TaskChanPair<MGraphSolver::SubstEx>
 MGraphSolver::generateOr(Atom target, Subst baseSubst,
                          NameAllocator allocator) {
+  // search for hooks in hook table
+  if (m_atomHooks.count(target.getName()) == 0)
+    return generateOrBasic(std::move(target), std::move(baseSubst),
+                           std::move(allocator));
+  auto hook = m_atomHooks.at(target.getName());
+  auto tcp = hook->prove(target.getArguments(), std::move(baseSubst));
+  return taskChanPairEx(std::move(tcp));
+}
+
+TaskChanPair<MGraphSolver::SubstEx>
+MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
+                              NameAllocator allocator) {
   auto output = std::make_shared<Channel<SubstEx>>();
   std::jthread worker([this, target = std::move(target),
                        baseSubst = std::move(baseSubst),
@@ -121,7 +148,8 @@ MGraphSolver::generateAnd(std::vector<Atom> targets, Subst baseSubst,
         if (!ok)
           break;
         NameAllocator subAllocator = allocator;
-        saturateAllocator(subAllocator, substEx.subst);
+        for (auto &name : subst.getAllVarNames())
+          subAllocator.allocateName(name);
         auto [andWorker, andChan] =
             generateAnd(rest, substEx.subst, std::move(subAllocator));
         while (true) {

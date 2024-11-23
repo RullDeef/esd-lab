@@ -1,9 +1,19 @@
+#include "atom_hook.h"
 #include "database.h"
 #include "mgraph_solver.h"
 #include "parser.h"
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <utility>
+
+// pre-defined atom hooks
+std::map<std::string, std::shared_ptr<AtomHook>> buildPredefinedHooks() {
+  return {
+      {"write", std::make_shared<WriteHook>()},
+      {"leq", std::make_shared<LeqHook>()},
+  };
+}
 
 std::pair<std::optional<Atom>, bool> inputTarget(bool &run,
                                                  Database &database) {
@@ -54,14 +64,15 @@ int main(int argc, char **argv) {
     auto [target, forward] = inputTarget(run, *database);
     if (!target)
       continue;
-    MGraphSolver solver(database);
+    auto solver =
+        std::make_shared<MGraphSolver>(database, buildPredefinedHooks());
     if (forward)
-      solver.solveForward(*target);
+      solver->solveForward(*target);
     else
-      solver.solveBackward(*target);
+      solver->solveBackward(*target);
     std::string line;
     do {
-      auto subst = solver.next();
+      auto subst = solver->next();
       if (!subst) {
         std::cout << "end" << std::endl;
         break;
@@ -71,6 +82,7 @@ int main(int argc, char **argv) {
         std::getline(std::cin, line);
       }
     } while (!line.empty());
+    solver->done();
   }
   return 0;
 }
