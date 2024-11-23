@@ -14,6 +14,27 @@ TEST(ChannelTest, unbuffered) {
   EXPECT_EQ(val, 321);
 }
 
+TEST(ChannelTest, unbufferedStress) {
+  Channel<int> chan;
+
+  auto futurePut = std::async(std::launch::async, [&chan]() {
+    for (int i = 0; i < 10; ++i) {
+      EXPECT_TRUE(chan.put(i));
+    }
+    chan.close();
+  });
+
+  for (int i = 0; i < 10; ++i) {
+    auto [val, ok] = chan.get();
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(val, i);
+  }
+
+  futurePut.wait();
+  auto [endVal, ok] = chan.get();
+  EXPECT_FALSE(ok);
+}
+
 TEST(ChannelTest, buffered) {
   ChannelBuf<int> chan(1);
 

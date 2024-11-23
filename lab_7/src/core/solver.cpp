@@ -2,33 +2,36 @@
 #include "channel.h"
 #include "database.h"
 #include "subst.h"
-#include <deque>
 #include <iostream>
-#include <iterator>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <thread>
 
-Solver::Solver(const Database &database) : m_database(database) {}
+Solver::Solver(std::shared_ptr<Database> database)
+    : m_database(std::move(database)) {}
 
 Solver::~Solver() { done(); }
 
 void Solver::solveForward(Atom target) {
   done();
   m_channel = std::make_shared<Channel<Subst>>();
-  m_solverThread = std::thread([this, target = std::move(target)]() {
-    solveForwardThreaded(std::move(target), *m_channel);
-    m_channel->close();
-  });
+  m_solverThread = std::thread(
+      [this, lock = shared_from_this(), target = std::move(target)]() {
+        solveForwardThreaded(std::move(target), *m_channel);
+        std::cout << "channel closed!\n";
+        m_channel->close();
+      });
 }
 
 void Solver::solveBackward(Atom target) {
   done();
   m_channel = std::make_shared<Channel<Subst>>();
-  m_solverThread = std::thread([this, target = std::move(target)]() {
-    solveBackwardThreaded(std::move(target), *m_channel);
-    m_channel->close();
-  });
+  m_solverThread = std::thread(
+      [this, lock = shared_from_this(), target = std::move(target)]() {
+        solveBackwardThreaded(std::move(target), *m_channel);
+        m_channel->close();
+      });
 }
 
 std::optional<Subst> Solver::next() {
@@ -47,14 +50,15 @@ void Solver::done() {
 
 void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
   WorkingDataset workset;
-  for (auto &rule : m_database.getRules()) {
+  for (auto &rule : m_database->getRules()) {
     if (!rule.isFact())
       continue;
     // проверить, находится ли цель среди фактов в базе правил
     Subst subst;
     if (unify(rule.getOutput(), target, subst)) {
       bool wasEmpty = subst.empty();
-      output.put(std::move(subst));
+      if (!output.put(std::move(subst)))
+        return;
       // завершить поиск если была сгенерирована пустая подстановка
       if (wasEmpty)
         return;
@@ -65,7 +69,8 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
   while (newAdded) {
     newAdded = false;
     workset.nextIteration(); // обновить счетчик шага
-    for (auto &rule : m_database.getRules()) {
+    for (auto &rule : m_database->getRules()) {
+      std::cout << "rule: " << rule.toString() << std::endl;
       // проверить, что входы правила содержат атом из доказанных на
       // предыдущем шаге
       bool hasNewFacts = false;
@@ -76,10 +81,15 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
       if (!hasNewFacts)
         continue;
       // проверить покрытие входов из доказанных фактов
-      auto channel = unifyInputs(rule, workset);
+      std::cout << "start unifying\n";
+      auto [worker, channel] = unifyInputs(rule, workset);
+      std::cout << "new iteration!\n";
       while (true) {
         // перебираем все возможные подстановки
+        std::cout << "unifying inputs...\n";
         auto [subst, ok] = channel->get();
+        std::cout << "got " << subst.toString() << " " << std::boolalpha << ok
+                  << std::endl;
         if (!ok)
           break;
         auto newFact = subst.apply(rule.getOutput());
@@ -89,28 +99,42 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
         // проверить, что новый факт удовлетворяет цели
         Subst res;
         if (unify(newFact, target, res)) {
-          if (!output.put(std::move(res)))
-            break;
+          std::cout << "outputing res = " << res.toString() << std::endl;
+          if (!output.put(std::move(res))) {
+            std::cout << "closed!\n";
+            channel->close();
+            if (worker.joinable())
+              worker.join();
+            return;
+          }
+          std::cout << "ok!\n";
         }
         workset.addFact(newFact);
         newAdded = true;
       }
+      std::cout << "new fact: " << newAdded << std::endl;
+      channel->close();
+      if (worker.joinable())
+        worker.join();
     }
+    std::cout << "new fact added: " << newAdded << "\n";
   }
+  std::cout << "done!\n";
 }
 
 void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {}
 
-std::shared_ptr<Channel<Subst>> Solver::unifyInputs(const Rule &rule,
-                                                    WorkingDataset &workset) {
+std::pair<std::thread, std::shared_ptr<Channel<Subst>>>
+Solver::unifyInputs(const Rule &rule, WorkingDataset &workset) {
   auto channel = std::make_shared<Channel<Subst>>();
   std::thread worker([&rule, &workset, channel]() {
     auto inputs = rule.getInputs();
+    std::cout << "unifying inputs for " << rule.toString() << std::endl;
     unifyRest(inputs.begin(), inputs.end(), workset, Subst(), *channel);
+    std::cout << "done unifying!\n";
     channel->close();
   });
-  worker.detach();
-  return channel;
+  return std::make_pair(std::move(worker), channel);
 }
 
 bool Solver::unifyRest(std::vector<Atom>::const_iterator begin,
@@ -118,7 +142,7 @@ bool Solver::unifyRest(std::vector<Atom>::const_iterator begin,
                        WorkingDataset &workset, const Subst &prev,
                        Channel<Subst> &channel, bool wasNewFact) {
   if (begin == end)
-    return !wasNewFact || channel.put(prev);
+    return !wasNewFact || (!channel.isClosed() && channel.put(prev));
   // проверить все возможные факты для данного атома, если нашли совпадение -
   // проверяем следующие атомы
   auto &curr = *begin++;

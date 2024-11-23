@@ -4,12 +4,15 @@
 #include "solver.h"
 #include <gtest/gtest.h>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
+#include <unistd.h>
 
-static Database buildDatabase(std::initializer_list<const char *> rules) {
-  Database database;
+static std::shared_ptr<Database>
+buildDatabase(std::initializer_list<const char *> rules) {
+  auto database = std::make_shared<Database>();
   for (auto &rule : rules)
-    database.addRule(RuleParser().ParseRule(rule));
+    database->addRule(RuleParser().ParseRule(rule));
   return database;
 }
 
@@ -26,15 +29,15 @@ TEST(SolverTest, taskFromBook) {
   });
 
   auto target = RuleParser().ParseRule("Criminal(x)").getOutput();
-  Solver solver(database);
+  auto solver = std::make_shared<Solver>(database);
 
-  solver.solveForward(target);
+  solver->solveForward(target);
 
-  auto res = solver.next();
+  auto res = solver->next();
   EXPECT_TRUE(res);
   if (res)
     std::cout << "res: " << res->toString() << std::endl;
-  solver.done();
+  solver->done();
 }
 
 TEST(SolverTest, sameVarUnify) {
@@ -43,11 +46,11 @@ TEST(SolverTest, sameVarUnify) {
   });
 
   auto target = RuleParser().ParseRule("P(y, y, y)").getOutput();
-  Solver solver(database);
-  solver.solveForward(target);
+  auto solver = std::make_shared<Solver>(database);
+  solver->solveForward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   EXPECT_TRUE(res);
 }
@@ -80,11 +83,11 @@ TEST(SolverTest, transitivity) {
   });
 
   auto target = RuleParser().ParseRule("Less(3, 6)").getOutput();
-  Solver solver(database);
-  solver.solveForward(target);
+  auto solver = std::make_shared<Solver>(database);
+  solver->solveForward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   EXPECT_TRUE(res);
 }
@@ -100,11 +103,11 @@ TEST(SolverTest, backtrackMax3) {
   });
 
   auto target = RuleParser().ParseRule("max(1, 3, 2, x)").getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   EXPECT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=3}");
@@ -125,13 +128,19 @@ TEST(SolverTest, backtrackMax3AllCombs) {
   });
 
   auto target = RuleParser().ParseRule("max(1, x, 2, x)").getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res1 = solver.next();
-  auto res2 = solver.next();
-  auto res3 = solver.next();
-  solver.done();
+  auto res1 = solver->next();
+  std::cout << "waiting next solution...\n";
+  // sleep(1);
+  auto res2 = solver->next();
+  std::cout << "waiting next solution...\n";
+  // sleep(1);
+  auto res3 = solver->next();
+  std::cout << "waiting next solution...\n";
+  // sleep(1);
+  solver->done();
 
   ASSERT_TRUE(res1);
   EXPECT_EQ(res1->toString(), "{x=3}");
@@ -150,11 +159,11 @@ TEST(SolverTest, listLen) {
   auto target = RuleParser()
                     .ParseRule("len(cons(A, cons(B, cons(C, Nil))), x)")
                     .getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   ASSERT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=succ(succ(succ(0)))}");
@@ -168,11 +177,11 @@ TEST(SolverTest, listLenReverse) {
 
   auto target =
       RuleParser().ParseRule("len(x, succ(succ(succ(0))))").getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   ASSERT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=cons(_, cons(_, cons(_, Nil)))}");
@@ -189,11 +198,11 @@ TEST(SolverTest, listReverse) {
   auto target = RuleParser()
                     .ParseRule("reverse(cons(A, cons(B, cons(C, Nil))), x)")
                     .getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   ASSERT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=cons(C, cons(B, cons(A, Nil)))}");
@@ -205,11 +214,11 @@ TEST(SolverTest, recursiveFuncSym) {
   });
 
   auto target = RuleParser().ParseRule("link(cons(A, x), x)").getOutput();
-  MGraphSolver solver(database);
-  solver.solveBackward(target);
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
 
-  auto res = solver.next();
-  solver.done();
+  auto res = solver->next();
+  solver->done();
 
   ASSERT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=cons(A, ...)}");

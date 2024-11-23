@@ -4,6 +4,7 @@
 #include "database.h"
 #include "name_allocator.h"
 #include "solver.h"
+#include <thread>
 
 class MGraphSolver : public Solver {
 public:
@@ -18,16 +19,17 @@ public:
     bool cut;
   };
 
-  MGraphSolver(const Database &database) : Solver(database) {}
+  MGraphSolver(std::shared_ptr<Database> database)
+      : Solver(std::move(database)) {}
 
 protected:
   virtual void solveBackwardThreaded(Atom target,
                                      Channel<Subst> &output) override;
 
 private:
-  void generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
-                  Channel<SubstEx> &output);
+  std::thread generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
+                         Channel<SubstEx> &output);
 
-  void generateAnd(std::vector<Atom> targets, Subst baseSubst,
-                   NameAllocator allocator, Channel<SubstEx> &output);
+  std::thread generateAnd(std::vector<Atom> targets, Subst baseSubst,
+                          NameAllocator allocator, Channel<SubstEx> &output);
 };

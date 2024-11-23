@@ -12,7 +12,7 @@ struct AtomEx {
 
 class PrologSolver : public Solver {
 public:
-  PrologSolver(const Database &database);
+  PrologSolver(std::shared_ptr<Database> database);
 
 protected:
   virtual void solveBackwardThreaded(Atom target,

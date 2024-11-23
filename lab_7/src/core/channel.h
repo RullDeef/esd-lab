@@ -6,6 +6,7 @@
 #include <mutex>
 #include <ostream>
 #include <stdexcept>
+#include <unistd.h>
 
 template <typename T> class ChannelBuf {
 public:
@@ -64,6 +65,17 @@ private:
 // unbuffered channel
 template <typename T> class Channel {
 public:
+  ~Channel() {
+    std::unique_lock lock(m_mutex);
+    m_closed = true;
+    if (m_getWaiting > 0 || m_putWaiting > 0) {
+      m_condGet.notify_all();
+      m_condPut.notify_all();
+      m_condPut.wait(
+          lock, [this]() { return m_getWaiting == 0 && m_putWaiting == 0; });
+    }
+  }
+
   bool isClosed() {
     std::unique_lock lock(m_mutex);
     return m_closed;
@@ -91,8 +103,10 @@ public:
     if (m_putWaiting == 0) {
       m_condGet.wait(lock);
     }
-    if (m_closed)
+    if (m_closed) {
+      m_getWaiting--;
       return {T(), false};
+    }
     T object = std::move(m_buffer);
     m_condPut.notify_all();
     m_getWaiting--;
@@ -109,10 +123,11 @@ public:
       return false;
     m_putWaiting++;
     m_buffer = std::move(object);
+    sleep(1);
     m_condGet.notify_one();
     m_condPut.wait(lock);
     m_putWaiting--;
-    return m_closed;
+    return true;
   }
 
 private:

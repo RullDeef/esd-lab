@@ -1,10 +1,11 @@
 #include "prolog_solver.h"
 #include <iostream>
 
-PrologSolver::PrologSolver(const Database &database) : Solver(database) {}
+PrologSolver::PrologSolver(std::shared_ptr<Database> database)
+    : Solver(std::move(database)) {}
 
 void PrologSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
-  auto dbStart = m_database.getRules().begin();
+  auto dbStart = m_database->getRules().begin();
 
   m_resolventStack.clear();
   m_resolventStack.push_front({{target, dbStart}});
@@ -32,12 +33,13 @@ void PrologSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
     // доказываем текущую подцель
     AtomEx *currTarget = &currTargets.front();
     std::cout << "curr target: " << currTarget->atom.toString() << " "
-              << std::distance(m_database.getRules().begin(), currTarget->label)
-              << "/" << m_database.rulesCount() << std::endl;
+              << std::distance(m_database->getRules().begin(),
+                               currTarget->label)
+              << "/" << m_database->rulesCount() << std::endl;
     // начинаем поиск правила, которое может доказать текущую подцель
     bool currTargetResolved = false;
     while (!currTargetResolved &&
-           currTarget->label != m_database.getRules().end()) {
+           currTarget->label != m_database->getRules().end()) {
       std::cout << "checking rule " << currTarget->label->toString()
                 << std::endl;
       Subst subst = Subst(); // varsStack.empty() ? Subst() : varsStack.front();
@@ -67,7 +69,7 @@ void PrologSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
           m_resolventStack.push_front({});
           for (auto input : currTarget->label->getInputs()) {
             m_resolventStack.front().push_front(
-                {subst.apply(input), m_database.getRules().begin()});
+                {subst.apply(input), m_database->getRules().begin()});
           }
         }
         currTargetResolved = true;
@@ -104,8 +106,8 @@ void PrologSolver::showState() const {
     std::cout << "    {";
     for (auto &atomEx : res)
       std::cout << atomEx.atom.toString() << "["
-                << std::distance(m_database.getRules().begin(), atomEx.label)
-                << "/" << m_database.rulesCount() << "], ";
+                << std::distance(m_database->getRules().begin(), atomEx.label)
+                << "/" << m_database->rulesCount() << "], ";
     std::cout << "}\n";
   }
   std::cout << "  backtrack:\n";
@@ -113,8 +115,8 @@ void PrologSolver::showState() const {
     std::cout << "    {";
     for (auto &atomEx : atomsEx)
       std::cout << atomEx.atom.toString() << "["
-                << std::distance(m_database.getRules().begin(), atomEx.label)
-                << "/" << m_database.rulesCount() << "], ";
+                << std::distance(m_database->getRules().begin(), atomEx.label)
+                << "/" << m_database->rulesCount() << "], ";
     std::cout << "}" << std::endl;
   }
   std::cout << "  substs:\n";

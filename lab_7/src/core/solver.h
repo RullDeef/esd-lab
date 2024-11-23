@@ -5,12 +5,13 @@
 #include "database.h"
 #include "subst.h"
 #include "variable.h"
+#include <memory>
 #include <optional>
 #include <thread>
 
-class Solver {
+class Solver : public std::enable_shared_from_this<Solver> {
 public:
-  Solver(const Database &database);
+  Solver(std::shared_ptr<Database> database);
   virtual ~Solver();
 
   void solveForward(Atom target);
@@ -32,8 +33,8 @@ protected:
 
   // проверить покрытие входов правила фактами из рабочей памяти. Дополнительно
   // вернуть флаг использования факта полученного на предыдущей итерации
-  static std::shared_ptr<Channel<Subst>> unifyInputs(const Rule &rule,
-                                                     WorkingDataset &workset);
+  static std::pair<std::thread, std::shared_ptr<Channel<Subst>>>
+  unifyInputs(const Rule &rule, WorkingDataset &workset);
 
   static bool unifyRest(std::vector<Atom>::const_iterator begin,
                         std::vector<Atom>::const_iterator end,
@@ -43,5 +44,5 @@ protected:
   std::thread m_solverThread;
   std::shared_ptr<Channel<Subst>> m_channel;
   bool m_stopRequest;
-  const Database &m_database;
+  std::shared_ptr<Database> m_database;
 };

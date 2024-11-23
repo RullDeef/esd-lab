@@ -40,9 +40,9 @@ std::pair<std::optional<Atom>, bool> inputTarget(bool &run,
 }
 
 int main(int argc, char **argv) {
-  Database database;
+  auto database = std::make_shared<Database>();
   if (argc == 2)
-    database = Database(argv[1]);
+    database = std::make_shared<Database>(argv[1]);
   else if (argc != 1) {
     std::cout << "usage: " << argv[0] << " [database.txt]" << std::endl;
     return -1;
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
   // start repl
   bool run = true;
   while (run) {
-    auto [target, forward] = inputTarget(run, database);
+    auto [target, forward] = inputTarget(run, *database);
     if (!target)
       continue;
     MGraphSolver solver(database);
