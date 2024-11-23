@@ -1,9 +1,21 @@
 #include "channel.h"
+#include <future>
 #include <gtest/gtest.h>
-#include <thread>
 
-TEST(ChannelTest, normalCase) {
+TEST(ChannelTest, unbuffered) {
   Channel<int> chan;
+
+  auto future = std::async(std::launch::async, [&chan]() { chan.put(321); });
+
+  auto [val, ok] = chan.get();
+  future.wait();
+
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(val, 321);
+}
+
+TEST(ChannelTest, buffered) {
+  ChannelBuf<int> chan(1);
 
   chan.put(123);
   auto [val, ok] = chan.get();
@@ -13,14 +25,14 @@ TEST(ChannelTest, normalCase) {
 }
 
 TEST(ChannelTest, inOtherThread) {
-  Channel<int> chan;
+  ChannelBuf<int> chan;
 
-  std::thread([&chan]() {
+  auto future = std::async(std::launch::async, [&chan]() {
     chan.put(10);
     chan.put(20);
     chan.put(30);
     chan.close();
-  }).detach();
+  });
 
   auto [val1, ok1] = chan.get();
   EXPECT_EQ(val1, 10);
@@ -36,4 +48,6 @@ TEST(ChannelTest, inOtherThread) {
 
   auto [val4, ok4] = chan.get();
   EXPECT_FALSE(ok4);
+
+  future.wait();
 }

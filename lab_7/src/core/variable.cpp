@@ -1,6 +1,7 @@
 
 #include "variable.h"
 #include <algorithm>
+#include <memory>
 
 Variable::Variable(bool isConst, std::string value,
                    std::vector<Variable::ptr> arguments)
@@ -72,21 +73,23 @@ void Variable::updateArgument(size_t i, Variable::ptr value) {
 Variable::ptr Variable::clone(std::map<Variable *, Variable::ptr> *varMap) {
   if (m_isConst || m_arguments.empty())
     return shared_from_this(); // safe omit clone
-  std::vector<Variable::ptr> args;
   if (varMap == nullptr) {
     std::map<Variable *, Variable::ptr> defaultVarMap;
-    for (auto &arg : m_arguments)
-      args.push_back(arg->clone(&defaultVarMap));
+    defaultVarMap[this] =
+        std::make_shared<Variable>(m_isConst, m_value, m_arguments);
+    for (int i = 0; i < m_arguments.size(); ++i)
+      defaultVarMap[this]->updateArgument(
+          i, m_arguments[i]->clone(&defaultVarMap));
+    return defaultVarMap[this];
   } else {
     if (varMap->count(this) != 0)
       return varMap->at(this);
-    for (auto &arg : m_arguments)
-      args.push_back(arg->clone(varMap));
+    (*varMap)[this] =
+        std::make_shared<Variable>(m_isConst, m_value, m_arguments);
+    for (size_t i = 0; i < m_arguments.size(); ++i)
+      (*varMap)[this]->updateArgument(i, m_arguments[i]->clone(varMap));
+    return (*varMap)[this];
   }
-  auto res = std::make_shared<Variable>(m_isConst, m_value, std::move(args));
-  if (varMap != nullptr)
-    (*varMap)[this] = res;
-  return res;
 }
 
 std::string Variable::toString() const { return toString(nullptr); }

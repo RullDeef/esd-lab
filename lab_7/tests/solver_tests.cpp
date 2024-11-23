@@ -112,9 +112,9 @@ TEST(SolverTest, backtrackMax3) {
 
 TEST(SolverTest, backtrackMax3AllCombs) {
   auto database = buildDatabase({
-      "max(a, b, c, a) :- less(b, a), less(c, a), cut",
-      "max(_, b, c, b) :- less(c, b), cut",
-      "max(_, _, c, c) :- cut",
+      "max(a, b, c, a) :- less(b, a), less(c, a)",
+      "max(_, b, c, b) :- less(c, b)",
+      "max(_, _, c, c)",
       "less(1, 2)",
       "less(1, 3)",
       "less(2, 3)",
@@ -196,5 +196,21 @@ TEST(SolverTest, listReverse) {
   solver.done();
 
   ASSERT_TRUE(res);
-  ASSERT_EQ(res->toString(), "{x=cons(C, cons(B, cons(A, Nil)))}");
+  EXPECT_EQ(res->toString(), "{x=cons(C, cons(B, cons(A, Nil)))}");
+}
+
+TEST(SolverTest, recursiveFuncSym) {
+  auto database = buildDatabase({
+      "link(x, x)",
+  });
+
+  auto target = RuleParser().ParseRule("link(cons(A, x), x)").getOutput();
+  MGraphSolver solver(database);
+  solver.solveBackward(target);
+
+  auto res = solver.next();
+  solver.done();
+
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->toString(), "{x=cons(A, ...)}");
 }
