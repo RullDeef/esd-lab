@@ -9,6 +9,9 @@
 #include <optional>
 #include <thread>
 
+template <typename T>
+using TaskChanPair = std::pair<std::jthread, std::shared_ptr<Channel<T>>>;
+
 class Solver : public std::enable_shared_from_this<Solver> {
 public:
   Solver(std::shared_ptr<Database> database);
@@ -33,8 +36,8 @@ protected:
 
   // проверить покрытие входов правила фактами из рабочей памяти. Дополнительно
   // вернуть флаг использования факта полученного на предыдущей итерации
-  static std::pair<std::jthread, std::shared_ptr<Channel<Subst>>>
-  unifyInputs(const Rule &rule, WorkingDataset &workset);
+  static TaskChanPair<Subst> unifyInputs(const Rule &rule,
+                                         WorkingDataset &workset);
 
   static bool unifyRest(std::vector<Atom>::const_iterator begin,
                         std::vector<Atom>::const_iterator end,

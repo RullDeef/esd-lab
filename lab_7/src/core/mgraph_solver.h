@@ -4,7 +4,6 @@
 #include "database.h"
 #include "name_allocator.h"
 #include "solver.h"
-#include <thread>
 
 class MGraphSolver : public Solver {
 public:
@@ -27,9 +26,9 @@ protected:
                                      Channel<Subst> &output) override;
 
 private:
-  std::jthread generateOr(Atom target, Subst baseSubst, NameAllocator allocator,
-                          Channel<SubstEx> &output);
+  TaskChanPair<SubstEx> generateOr(Atom target, Subst baseSubst,
+                                   NameAllocator allocator);
 
-  std::jthread generateAnd(std::vector<Atom> targets, Subst baseSubst,
-                           NameAllocator allocator, Channel<SubstEx> &output);
+  TaskChanPair<SubstEx> generateAnd(std::vector<Atom> targets, Subst baseSubst,
+                                    NameAllocator allocator);
 };

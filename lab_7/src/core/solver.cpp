@@ -105,8 +105,8 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
 
 void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {}
 
-std::pair<std::jthread, std::shared_ptr<Channel<Subst>>>
-Solver::unifyInputs(const Rule &rule, WorkingDataset &workset) {
+TaskChanPair<Subst> Solver::unifyInputs(const Rule &rule,
+                                        WorkingDataset &workset) {
   auto channel = std::make_shared<Channel<Subst>>();
   std::jthread worker([&rule, &workset, channel]() {
     auto inputs = rule.getInputs();
