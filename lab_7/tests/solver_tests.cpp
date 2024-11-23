@@ -132,14 +132,8 @@ TEST(SolverTest, backtrackMax3AllCombs) {
   solver->solveBackward(target);
 
   auto res1 = solver->next();
-  std::cout << "waiting next solution...\n";
-  // sleep(1);
   auto res2 = solver->next();
-  std::cout << "waiting next solution...\n";
-  // sleep(1);
   auto res3 = solver->next();
-  std::cout << "waiting next solution...\n";
-  // sleep(1);
   solver->done();
 
   ASSERT_TRUE(res1);

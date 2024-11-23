@@ -1,17 +1,12 @@
 #include "mgraph_solver.h"
 #include "name_allocator.h"
 #include "subst.h"
-#include <iostream>
 #include <memory>
 #include <thread>
 
 static void saturateAllocator(NameAllocator &allocator, const Subst &subst) {
-  std::cout << "saturating allocator with {";
-  for (auto &name : subst.getAllVarNames()) {
-    std::cout << name << ", ";
+  for (auto &name : subst.getAllVarNames())
     allocator.allocateName(name);
-  }
-  std::cout << "}\n";
 }
 
 static Rule standardize(const Rule &rule, NameAllocator &allocator) {
@@ -29,20 +24,16 @@ void MGraphSolver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {
   while (!output.isClosed()) {
     auto [substEx, ok] = mid->get();
     if (!ok) {
-      std::cout << "search done!\n";
       output.close();
       break;
     }
-    std::cout << "GOT SUBST: " << substEx.subst.toString() << std::endl;
     // filter subst to include only relevant variables
     Subst filtered;
     for (auto varName : target.getAllVars())
       filtered.insert(varName, substEx.subst.apply(
                                    std::make_shared<Variable>(false, varName)));
-    if (!output.put(std::move(filtered))) {
-      std::cout << "other solutions rejected!\n";
+    if (!output.put(std::move(filtered)))
       break;
-    }
   }
   mid->close();
 }
@@ -53,25 +44,15 @@ std::jthread MGraphSolver::generateOr(Atom target, Subst baseSubst,
   std::jthread worker([this, target = std::move(target),
                        baseSubst = std::move(baseSubst),
                        allocator = std::move(allocator), &output]() {
-    std::cout << "proving " << target.toString() << " with "
-              << baseSubst.toString() << std::endl;
     for (auto &rule : m_database->getRules()) {
       if (output.isClosed()) {
         break;
       }
       NameAllocator subAllocator = allocator;
-      std::cout << "base subst: " << baseSubst.toString() << std::endl;
-      std::cout << "db: " << m_database->rulesCount() << std::endl;
       Subst subst = baseSubst;
       Rule stdRule = standardize(rule, subAllocator);
-      std::cout << "target:\n" << target.toString();
-      if (!unify(target, stdRule.getOutput(), subst)) {
-        std::cout << " not unified with\n"
-                  << stdRule.getOutput().toString() << "\n";
+      if (!unify(target, stdRule.getOutput(), subst))
         continue;
-      }
-      std::cout << " unified with\n"
-                << stdRule.toString() << " " << subst.toString() << std::endl;
       if (stdRule.isFact()) {
         if (!output.put({subst, false}))
           break;
@@ -94,10 +75,8 @@ std::jthread MGraphSolver::generateOr(Atom target, Subst baseSubst,
           return;
         }
       }
-      if (wasCut) {
-        std::cout << "rule " << target.toString() << " was cut!\n";
+      if (wasCut)
         break;
-      }
       mid->close();
     }
     output.close();
@@ -121,11 +100,7 @@ std::jthread MGraphSolver::generateAnd(std::vector<Atom> targets,
     std::vector<Atom> rest(targets.begin() + 1, targets.end());
     for (auto &atom : rest)
       atom = subst.apply(atom);
-    std::cout << "proving targets " << first.toString() << " and rest:\n";
-    for (auto &atom : rest)
-      std::cout << "  " << atom.toString() << std::endl;
     if (first.toString() == "cut") {
-      std::cout << "cut encountered!\n";
       auto andChan = std::make_shared<Channel<SubstEx>>();
       auto worker = generateAnd(rest, subst, std::move(allocator), *andChan);
       while (true) {

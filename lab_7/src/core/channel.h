@@ -2,11 +2,8 @@
 
 #include <condition_variable>
 #include <deque>
-#include <iostream>
 #include <mutex>
-#include <ostream>
 #include <stdexcept>
-#include <unistd.h>
 
 template <typename T> class ChannelBuf {
 public:
