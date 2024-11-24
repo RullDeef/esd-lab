@@ -1,0 +1,266 @@
+\chapter{Практический раздел}
+
+База правил хранит список правил. Факты представлены структурой правила с пустым списком входных атомов.
+
+\section{Формализация алгоритма обратного дедуктивного вывода}
+
+Алгоритм обратного дедуктивного вывода \textbf{Backward-ASK} работает на основе генераторов для обеспечения поиска всех возможных решений для цели с возможностью приостановки поиска. Главная идея алгоритма --- обратный поиск в глубину в графе И-ИЛИ с использованием двух процедур --- \textbf{Backward-OR} и \textbf{Backward-AND}.
+
+\begin{algorithm}[h!]
+  \caption{\textbf{Backward-ASK}. Алгоритм обратного дедуктивного вывода}
+  \label{alg:backward-ask}
+  \hspace*{\algorithmicindent} \textbf{Вход:} \textit{KB} --- база правил, \textit{цель} --- атом. \\
+  \hspace*{\algorithmicindent} \textbf{Выход:} генератор подстановок
+  \begin{algorithmic}[1]
+  \\
+  \Return Backward-OR (\textit{KB}, \textit{цель}, \{\})
+  \end{algorithmic}
+\end{algorithm}
+
+Процедура \textbf{Backward-OR} производит перебор правил, которые \textit{разрешают} текущую подцель (то есть выходная вершина которых унифицируется с текущей подцелью), и после переименования переменных в найденном правиле вызывает процедуру \textbf{Backward-AND} для доказательства входных атомов текущего правила с применением подстановки, полученной в процессе унификации заключения текущего правила и текущей подцели. Если текущее правило оказалось фактом, его посылка будет пуста. Эту ситуацию обработает процедура \textbf{Backward-AND}.
+
+\begin{algorithm}[h!]
+  \caption{\textbf{Backward-OR}. Алгоритм перебора правил ИЛИ}
+  \label{alg:backward-or}
+  \hspace*{\algorithmicindent} \textbf{Вход:} \textit{KB} --- база правил, \textit{подцель} --- атом, $\theta$ --- базовая подстановка. \\
+  \hspace*{\algorithmicindent} \textbf{Выход:} генератор подстановок
+  \begin{algorithmic}[1]
+  \For{по всем \textit{правилам} $\gets KB$ разрешающим \textit{подцель}}
+    \State (\textit{посылка} $\Rightarrow$ \textit{заключение}) $\gets$ \textbf{STD-VAR}(\textit{правило})
+    \For{$\theta' \in$ \textbf{Backward-AND}(\textit{KB}, \textit{посылка}, \textbf{UNIFY}(\textit{заключение}, \textit{подцель}, $\theta$))}
+      \State \textbf{Выбросить} подстановку $\theta'$
+    \EndFor
+  \EndFor
+  \end{algorithmic}
+\end{algorithm}
+
+Функция \textbf{STD-VAR} выполняет переименование переменных входного правила и возвращает новое правило.
+
+Функция \textbf{UNIFY} производит унификацию двух атомов с заданной подстановкой и возвращает новую подстановку. В случае невозможности унификации, функция возвращает ошибку.
+
+Процедура \textbf{Backward-AND} выполняет доказательство входного списка подцелей. Для этого выполняется перебор всех возможных подстановок для первой подцели с использованием процедуры \textbf{Backward-OR}. Затем выполняется рекурсивный вызов для доказательства остальных подцелей с полученной подстановкой.
+
+\begin{algorithm}[h!]
+  \caption{\textbf{Backward-AND}. Алгоритм перебора правил И}
+  \label{alg:backward-and}
+  \hspace*{\algorithmicindent} \textbf{Вход:} \textit{KB} --- база правил, \textit{подцели} --- список атомов, $\theta$ --- базовая подстановка. \\
+  \hspace*{\algorithmicindent} \textbf{Выход:} генератор подстановок
+  \begin{algorithmic}[1]
+    \If{$\theta$ --- ошибка} \Return
+    \ElsIf {список \textit{подцелей} пуст}
+      \State \textbf{Выбросить} подстановку $\theta$
+    \Else
+      \State \textit{голова}, \textit{хвост} $\gets$ список \textit{подцелей}
+      \For{$\theta' \in$ \textbf{Backward-OR}(\textit{KB}, \textbf{SUBST}(\textit{голова}, $\theta$), $\theta$)}
+        \For{$\theta'' \in$ \textbf{Backward-AND}(\textit{KB}, \textit{хвост}, $\theta'$)}
+          \State \textbf{Выбросить} подстановку $\theta''$
+        \EndFor
+      \EndFor
+    \EndIf
+  \end{algorithmic}
+\end{algorithm}
+
+Функция \textbf{SUBST} применяет подстановку к входному атому и возвращает новый атом.
+
+Рассмотрим пример работы описанного алгоритма обратного дедуктивного вывода. Пусть база знаний содержит следующие правила (факты являются частными случаями правил):
+\begin{eqnarray}
+  B(y, W) ~\&~ C(x, K, y) &\rightarrow& A(x, y), \\
+  D(y) ~\&~ E(x, K) &\rightarrow& B(x, y), \\
+  B(z, x) ~\&~ E(y, z) &\rightarrow& C(x, y, z), \\
+  && D(W), \\
+  && E(K, K).                     
+\end{eqnarray}
+
+Цель: $A(r, s)$.
+
+\begin{figure}[ht!]
+  \centering
+  \includegraphics[width=\linewidth]{backward-ask-1.pdf}
+  \caption{Пример простой схемы вывода}
+  \label{fig:ask1}
+\end{figure}
+
+Cхема вывода показана на рисунке \ref{fig:ask1}. Синим цветом указано направление передачи выбрасываемых подстановок из генераторов.
+
+\section{Поиск всех допустимых подстановок}
+
+Рассмотрим другой пример, иллюстрирующий возврат. Пусть база знаний состоит из следующих правил:
+\begin{eqnarray}
+Mark(st, sub, 5) ~\&~ Mark(st, sub, 4) &\rightarrow& GoodAt(st, sub) \\
+Mark(Alice, Maths, 4) \\
+Mark(Alice, Maths, 5) \\
+Mark(Bob, Maths, 3) \\
+Mark(Bob, Maths, 4) \\
+Mark(Carl, Phys, 5) \\
+Mark(Carl, Phys, 4) \\
+Mark(Alice, Phys, 4) \\
+Mark(Bob, Phys, 4) \\
+Mark(Bob, Phys, 3)
+\end{eqnarray}
+
+Цель --- найти все такие пары <<студент--предмет>>, что студент $st$ имеет оценки 4 и 5 по предмету $sub$. То есть найти все возможные подстановки для предиката $GoodAt(st, sub)$. Схема перебора допустимых подстановок представлена на рисунке \ref{fig:ask2}.
+
+\begin{figure}[ht!]
+  \centering
+  \includegraphics[width=\linewidth]{backward-ask-2.pdf}
+  \caption{Схема перебора всех допустимых подстановок}
+  \label{fig:ask2}
+\end{figure}
+
+\section{Отсечение дерева решений}
+
+Отсечение дерева решений реализуется введением дополнительного флага, передаваемого через очередь подстановок. Так как оператор отсечения может встретиться только в антициденте некоторого правила, то флаг отсечения должен генерироваться в процедуре \textbf{Backward-AND}. Как только первый атом из списка входных подцелей является оператором отсечения, процедура \texttt{Backward-AND} выбрасывает вместо подстановки специальный флаг, после чего продолжает свое выполнение пропустив первый элемент в списке подцелей (оператор отсечения).
+
+Обработать флаг отсечения вместо подстановки может только процедура \texttt{Backward-OR}. При получении данного флага в процедуре запрещается дальнейший перебор правил базы знаний. 
+
+\section{Механизм специальных процедур}
+
+Иногда значение истинности некоторого предиката не может быть выражено с использованием только лишь определенных выражений, или их количество может быть бесконечно большим. В таком случае можно ввсети таблицу, определяющую соответствие между именем предиката и некоторым объектом, которому будет делегирована задача по доказательству этого предиката. Описанная проверка производится в начале процедуры \textbf{Backward-OR}.
+
+В данной работе реализованы две специальные процедуры:
+\begin{enumerate}
+  \item \texttt{write(...)} --- выводит значения аргументов в консоль, всегда истиннен.
+  \item \texttt{leq(x, y)} $\Leftrightarrow$ $x$ и $y$ связаны с целыми числами и $x \le y$.
+  \item \texttt{in\_range(var, start, end)} --- если все агрументы связаны с целыми числами, то истинность определяется условием $start \le var < end$; если $var$ --- свободная переменная, а $start$ и $end$ связаны с целыми числами, то генерирует последовательность подстановок $\{i/var\}_{i=start}^{end-1}$.
+\end{enumerate}
+
+Используя последний предикат \texttt{in\_range} можно организовать последовательный перебор чисел. Например, следующая программа выведет в столбик все уникальные пары чисел от 1 до 10 не включительно:
+\begin{verbatim}
+  nums(x,y) :- in_range(v,x,y), in_range(u,v,y), write(v,u), fail
+  ?- nums(1, 10)
+\end{verbatim}
+
+\section{Сборка и запуск ПО}
+
+Для сборки программы используется \texttt{CMake}. Стандартная последовательность команд для сборки и запуска программы:
+
+\begin{verbatim}
+mkdir build && cd build && cmake ..
+make app && ./app # сборка и запуск программы
+make unittests && ./unittests # опциональный запуск юнит-тестов
+\end{verbatim}
+
+Альтернативно, можно собрать и запустить программу с помощью \texttt{makefile} скрипта в корневой папке используя цель <<\texttt{app}>>.
+
+При запуске основной программы (app) первым аргументом можно указать путь к файлу, содержащему правила базы знаний. По-умолчанию программа работает с пустой базой знаний.
+
+Основная программа работает в интерактивном режиме. Для добавления правила в базу знаний необходимо написать символ <<\texttt{+}>> и текст самого правила. Для запуска алгоритма дедуктивного вывода достаточно написать атом. При этом запустится алгоритм прямого дедуктивного вывода. Для запуска алгоритма обратного дедуктивного вывода необходимо ввести символ <<\texttt{!}>> перед атомом.
+
+Пример работы программы:
+\begin{verbatim}
+?- +P(x, y) :- Q(x), R(y)       # добавление правила
+>> P(x1, y1) :- Q(x1), R(y1)
+?- +R(A)                        # добавление фактов
+>> R(A)
+?- +Q(B)
+>> Q(B)
+?- P(a, b)                      # прямой вывод
+{a=B, b=A}                      # результат - подстановка
+next?- y                        # запрос продолжения поиска
+end                             # больше решений нет
+?- !P(r, s)                     # обратный вывод
+{r=B, s=A}
+next?-
+\end{verbatim}
+
+\section{Тестирование ПО}
+
+Для тестирования разработанного ПО были разработаны логические тесты, представленные в таблицах \ref{tbl:tests-1}--\ref{tbl:tests-2}.
+
+\begin{table}[ht]
+  \caption{Тестовые программы (часть 1)}
+  \label{tbl:tests-1}
+  \centering
+  \begin{tabular}{|l|l|}
+    \hline
+    \textbf{№} & \textbf{Правила теста} \\
+    \hline
+    \hline
+    1 & Поиск максимума из трех чисел \\
+    \hline
+    & \texttt{max(a, b, c, a) :- less(b, a), less(c, a)} \\
+    & \texttt{max(a, b, c, b) :- less(a, b), less(c, b)} \\
+    & \texttt{max(a, b, c, c) :- less(a, c), less(b, c)} \\
+    & \texttt{less(1, 2)} \\
+    & \texttt{less(2, 3)} \\
+    & \texttt{less(1, 3)} \\
+    \hline
+    & Запрос: \texttt{max(1, 3, 2, x)} \\
+    & Результат: \texttt{\{x=3\}} \\
+    \hline
+    \hline
+    2 & Определение длины списка \\
+    \hline
+    & \texttt{len(Nil, 0) :- !} \\
+    & \texttt{len(cons(\_, x), succ(n)) :- len(x, n)} \\
+    \hline
+    & Запрос: \texttt{len(cons(A, cons(B, cons(C, Nil))), x)} \\
+    & Результат: \texttt{\{x=succ(succ(succ(0)))\}} \\
+    \hline
+    \hline
+    3 & Генерация списка заданной длины \\
+    \hline
+    & \texttt{len(Nil, 0) :- !} \\
+    & \texttt{len(cons(\_, x), succ(n)) :- len(x, n)} \\
+    \hline
+    & Запрос: \texttt{len(x, succ(succ(succ(0))))} \\
+    & Результат: \texttt{\{x=cons(\_, cons(\_, cons(\_, Nil)))\}} \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[ht]
+  \caption{Тестовые программы (часть 2)}
+  \label{tbl:tests-2}
+  \centering
+  \begin{tabular}{|l|l|}
+    \hline
+    \textbf{№} & \textbf{Правила теста} \\
+    \hline
+    \hline
+    4 & Реверс списка \\
+    \hline
+    & \texttt{reverse(Nil, Nil) :- !} \\
+    & \texttt{reverse(x, y) :- reverse\_helper(x, y, Nil)} \\
+    & \texttt{reverse\_helper(Nil, x, x)} \\
+    & \texttt{reverse\_helper(cons(h, r), x, y) :-} \\
+    & \texttt{    reverse\_helper(r, x, cons(h, y))} \\
+    \hline
+    & Запрос: \texttt{reverse(cons(A, cons(B, cons(C, Nil))), x)} \\
+    & Результат: \texttt{\{x=cons(C, cons(B, cons(A, Nil)))\}} \\
+    \hline
+    \hline
+    5 & Лабиринт \\
+    \hline
+    & \texttt{\# +-\--\--+-\--\--+-\--\--+} \\
+    & \texttt{\# | 1 |X2X|X3X|} \\
+    & \texttt{\# +-\--\--+-\--\--+-\--\--+} \\
+    & \texttt{\# | 4 | 5 | 6 |} \\
+    & \texttt{\# +-\--\--+-\--\--+-\--\--+} \\
+    & \texttt{\# | 7 |X8X| 9 |} \\
+    & \texttt{\# +-\--\--+-\--\--+-\--\--+} \\
+    & \texttt{step(1, 4)} \\
+    & \texttt{step(4, 5)} \\
+    & \texttt{step(4, 7)} \\
+    & \texttt{step(5, 6)} \\
+    & \texttt{step(6, 9)} \\
+    & \texttt{way(x, y) :- step(x, y)} \\
+    & \texttt{way(x, y) :- step(x, z), way(z, y)} \\
+    \hline
+    & Запрос: \texttt{way(1, w)} \\
+    & Результат: \texttt{\{w=4\}, \{w=5\}, \{w=7\}, \{w=6\}, \{w=9\}} \\
+    \hline
+    \hline
+    6 & Различность \\
+    \hline
+    & \texttt{neq(x, x) :- !, fail} \\
+    & \texttt{neq(\_, \_)} \\
+    \hline
+    & Запрос: \texttt{neq(A, A)} \\
+    & Результат: \texttt{no} \\
+    \hline
+    & Запрос: \texttt{neq(A, B)} \\
+    & Результат: \texttt{\{\}} \\
+    \hline
+  \end{tabular}
+\end{table}
