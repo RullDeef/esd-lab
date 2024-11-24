@@ -82,3 +82,50 @@ protected:
     }
   }
 };
+
+// in_range(var, start, end) <=> (start <= var < end)
+// or act as a generator for free variable var
+class InRangeHook : public AtomHook {
+public:
+  InRangeHook() : AtomHook("in_range") {}
+
+protected:
+  virtual void proveThreaded(std::vector<Variable::ptr> args, Subst subst,
+                             std::shared_ptr<Channel<Subst>> output) override {
+    // there must be exactly 3 arguments
+    if (args.size() != 3)
+      return;
+    // second and third arguments must be bound to constant value
+    if (!args[1]->isConst() || !args[2]->isConst())
+      return;
+    // second and third arguments must be numerical values
+    try {
+      int start = std::stoi(args[1]->getValue());
+      int end = std::stoi(args[2]->getValue());
+      doRange(start, end, std::move(args[0]), std::move(subst),
+              std::move(output));
+    } catch (...) {
+    }
+  }
+
+private:
+  void doRange(int start, int end, Variable::ptr var, Subst subst,
+               std::shared_ptr<Channel<Subst>> output) {
+    if (var->isConst()) {
+      try {
+        int value = std::stoi(var->getValue());
+        if (start <= value && value < end)
+          output->put(std::move(subst));
+      } catch (...) {
+      }
+    } else if (var->isVariable()) {
+      for (int value = start; value < end; ++value) {
+        Subst newSubst = subst;
+        newSubst.insert(var->getValue(),
+                        Variable::createConst(std::to_string(value)));
+        if (!output->put(std::move(newSubst)))
+          break;
+      }
+    }
+  }
+};

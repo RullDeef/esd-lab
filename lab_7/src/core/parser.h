@@ -11,7 +11,7 @@
   <rule-math>   ::= <atom-list> '->' <atom>
   <rule-prolog> ::= <atom> ':-' <atom-list>
   <atom-list>   ::= <atom> [ (',' | '&') <atom-list> ]
-  <atom>        ::= IDENT [ '(' <arg-list> ')' ]
+  <atom>        ::= IDENT [ '(' <arg-list> ')' ] | '!'
   <arg-list>    ::= <arg> [ ',' <arg-list> ]
   <arg>         ::= STRING | IDENT [ '(' <arg-list> ')' ]
 */

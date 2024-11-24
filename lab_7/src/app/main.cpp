@@ -12,6 +12,7 @@ std::map<std::string, std::shared_ptr<AtomHook>> buildPredefinedHooks() {
   return {
       {"write", std::make_shared<WriteHook>()},
       {"leq", std::make_shared<LeqHook>()},
+      {"in_range", std::make_shared<InRangeHook>()},
   };
 }
 

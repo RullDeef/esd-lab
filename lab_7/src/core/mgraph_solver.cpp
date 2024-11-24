@@ -97,15 +97,16 @@ MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
         auto [subst2, ok] = mid->get();
         if (!ok)
           break;
-        wasCut = wasCut || subst2.cut;
-        if (!output->put({std::move(subst2.subst), false})) {
+        if (subst2.cut)
+          wasCut = true;
+        else if (!output->put({std::move(subst2.subst), false})) {
           mid->close();
           return;
         }
       }
+      mid->close();
       if (wasCut)
         break;
-      mid->close();
     }
     output->close();
   });
@@ -129,13 +130,14 @@ MGraphSolver::generateAnd(std::vector<Atom> targets, Subst baseSubst,
     std::vector<Atom> rest(targets.begin() + 1, targets.end());
     for (auto &atom : rest)
       atom = subst.apply(atom);
-    if (first.toString() == "cut") {
+    if (first.toString() == "cut" || first.toString() == "!") {
+      output->put({{}, true});
       auto [worker, andChan] = generateAnd(rest, subst, std::move(allocator));
       while (true) {
         auto [substEx2, ok2] = andChan->get();
         if (!ok2)
           break;
-        if (!output->put({std::move(substEx2.subst), true})) {
+        if (!output->put({std::move(substEx2.subst), false})) {
           andChan->close();
           return;
         }

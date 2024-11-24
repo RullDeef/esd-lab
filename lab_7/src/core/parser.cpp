@@ -54,6 +54,9 @@ std::vector<Atom> RuleParser::ParseAtomList() {
 }
 
 Atom RuleParser::ParseAtom() {
+  if (Eat("!")) {
+    return Atom("!");
+  }
   auto name = ParseIdent();
   if (!Eat("("))
     return Atom(std::move(name));
@@ -67,7 +70,6 @@ Atom RuleParser::ParseAtom() {
 }
 
 Variable::ptr RuleParser::ParseArg() {
-  SkipWhitespace();
   if (Peek("\""))
     return Variable::createString(ParseString());
   auto name = ParseIdent();
@@ -88,7 +90,6 @@ Variable::ptr RuleParser::ParseArg() {
 }
 
 std::string RuleParser::ParseString() {
-  SkipWhitespace();
   if (!Eat("\""))
     RaiseError("string expected");
   std::string res;

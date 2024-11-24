@@ -7,5 +7,28 @@ reverse(  x,   y) :- reverse_helper(x, y, Nil).
 reverse_helper(Nil, x, x).
 reverse_helper(cons(head, rest), y, x) :- reverse_helper(rest, y, cons(head, x)).
 
-test :- reverse(cons(A, cons(B, cons(C, Nil))), cons(C, cons(B, cons(A, Nil)))).
+test_reverse :- reverse(cons(A, cons(B, cons(C, Nil))), cons(C, cons(B, cons(A, Nil)))).
+
+last(cons(x, Nil), x) :- cut.
+last(cons(_, x), y) :- last(x, y).
+
+without_last(cons(_, Nil), Nil) :- cut.
+without_last(cons(x, y), cons(x, z)) :- without_last(y, z).
+
+#
+# concat(list1, list2, res)
+#
+concat(Nil, x, x) :- cut.
+concat(x, Nil, x) :- cut.
+concat(x, y, z) :- last(x, t), without_last(x, x1), concat(x1, cons(t, y), z).
+
+#
+# flatten(list_of_lists, res)
+#
+flatten(Nil, Nil) :- cut.
+flatten(cons(cons(h, t), t2), r) :- concat(t, t2, m), flatten(cons(h, m), r), cut.
+flatten(cons(h, t), cons(h, r)) :- flatten(t, r).
+
+# test case: [[A B] [C] [[D]]] -> [A B C D]
+test_flatten :- flatten(cons(cons(A, cons(B, Nil)), cons(cons(C, Nil), cons(cons(cons(D, Nil), Nil), Nil))), cons(A, cons(B, cons(C, cons(D, Nil)))))
 

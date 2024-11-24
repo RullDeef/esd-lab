@@ -17,12 +17,3 @@ mul(_, 0, 0).
 mul(s(0), x, x).
 mul(s(x), s(y), z) :- mul(x, y, r), sum(r, x, w), sum(s(y), w, z).
 
-
-# mul(3, 2, z) :- mul(2, 1, r), sum(r, 2, w), sum(2, w, z).
-# mul(2, 1, r) :- mul(1, 0, r1), sum(r1, 1, w1), sum(1, w1, r).
-# mul(1, 0, r1) => r1=0.
-# sum(0, 1, w1) => w1=1.
-# sum(1, 1, r) => r=2.
-# sum(2, 2, w) => w=4.
-# sum(2, 4, z) => z=6.
-
