@@ -4,6 +4,7 @@
 #include "solver.h"
 #include "subst.h"
 #include "variable.h"
+#include <chrono>
 #include <memory>
 #include <thread>
 #include <utility>
@@ -74,6 +75,9 @@ MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
                        baseSubst = std::move(baseSubst),
                        allocator = std::move(allocator), output]() {
     for (auto &rule : m_database->getRules()) {
+      // std::cout << "(OR) target: " << target.toString() << ". checking rule "
+      //           << rule.toString() << std::endl;
+      // std::this_thread::sleep_for(std::chrono::seconds(1));
       if (output->isClosed()) {
         break;
       }
@@ -97,9 +101,10 @@ MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
         auto [subst2, ok] = mid->get();
         if (!ok)
           break;
-        if (subst2.cut)
+        if (subst2.cut) {
+          // std::cout << "was cut!\n";
           wasCut = true;
-        else if (!output->put({std::move(subst2.subst), false})) {
+        } else if (!output->put({std::move(subst2.subst), false})) {
           mid->close();
           return;
         }
@@ -121,22 +126,29 @@ MGraphSolver::generateAnd(std::vector<Atom> targets, Subst baseSubst,
                        baseSubst = std::move(baseSubst),
                        allocator = std::move(allocator), output]() {
     if (targets.empty()) {
+      // std::cout << "output->put at " << __LINE__ << std::endl;
       output->put({baseSubst, false});
       output->close();
       return;
     }
+    // std::cout << "AND (";
+    // for (auto &target : targets)
+    //   std::cout << target.toString() << ", ";
+    // std::cout << ")\n";
     Subst subst = baseSubst;
     Atom first = subst.apply(targets.front());
     std::vector<Atom> rest(targets.begin() + 1, targets.end());
     for (auto &atom : rest)
       atom = subst.apply(atom);
     if (first.toString() == "cut" || first.toString() == "!") {
+      // std::cout << "(AND) cut encountered!\n";
       output->put({{}, true});
       auto [worker, andChan] = generateAnd(rest, subst, std::move(allocator));
       while (true) {
         auto [substEx2, ok2] = andChan->get();
         if (!ok2)
           break;
+        // std::cout << "output->put at " << __LINE__ << std::endl;
         if (!output->put({std::move(substEx2.subst), false})) {
           andChan->close();
           return;
@@ -158,7 +170,10 @@ MGraphSolver::generateAnd(std::vector<Atom> targets, Subst baseSubst,
           auto [substEx2, ok2] = andChan->get();
           if (!ok2)
             break;
-          if (!output->put({std::move(substEx2.subst), false})) {
+          // std::cout << "output->put at " << __LINE__ << " cut:" <<
+          // substEx2.cut
+          //           << std::endl;
+          if (!output->put(std::move(substEx2))) {
             andChan->close();
             orChan->close();
             return;

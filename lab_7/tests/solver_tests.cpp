@@ -16,6 +16,16 @@ buildDatabase(std::initializer_list<const char *> rules) {
   return database;
 }
 
+static std::map<std::string, std::shared_ptr<AtomHook>> buildPredefinedHooks() {
+  return {
+      {"write", std::make_shared<WriteHook>()},
+      {"add", std::make_shared<IntAddHook>()},
+      {"mul", std::make_shared<IntMulHook>()},
+      {"leq", std::make_shared<LeqHook>()},
+      {"in_range", std::make_shared<InRangeHook>()},
+  };
+}
+
 TEST(SolverTest, taskFromBook) {
   auto database = buildDatabase({
       "American(x) & Weapon(y) & Sells(x, y, z) & Hostile(z) -> Criminal(x)",
@@ -214,4 +224,73 @@ TEST(SolverTest, recursiveFuncSym) {
 
   ASSERT_TRUE(res);
   EXPECT_EQ(res->toString(), "{x=cons(A, ...)}");
+}
+
+TEST(SolverTest, properCut) {
+  auto database = buildDatabase({
+      "q(A)",
+      "q(B)",
+      "q(C)",
+      "p(A) :- !",
+      "p(x) :- q(x), !, fail",
+      "p(_)",
+  });
+
+  auto target = RuleParser().ParseRule("p(B)").getOutput();
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
+
+  auto res = solver->next();
+  solver->done();
+
+  ASSERT_FALSE(res);
+}
+
+TEST(SolverTest, properCut2) {
+  auto database = buildDatabase({
+      "p(A) :- !",
+      "p(B)",
+      "p(C)",
+  });
+
+  auto target = RuleParser().ParseRule("p(x)").getOutput();
+  auto solver = std::make_shared<MGraphSolver>(database);
+  solver->solveBackward(target);
+
+  auto res1 = solver->next();
+  auto res2 = solver->next();
+  solver->done();
+
+  ASSERT_TRUE(res1);
+  EXPECT_EQ(res1->toString(), "{x=A}");
+
+  ASSERT_FALSE(res2);
+}
+
+TEST(SolverTest, primes) {
+  auto database = buildDatabase({
+      "divisible(x, y) :- mul(y, z, x), mul(y, z, x), !",
+      "composite(x) :- in_range(v, 2, x), divisible(x, v), !",
+      "prime(1) :- !, fail",
+      "prime(x) :- composite(x), !, fail",
+      "prime(_)",
+  });
+  auto hooks = buildPredefinedHooks();
+  auto solver = std::make_shared<MGraphSolver>(database, hooks);
+
+  auto target1 = RuleParser().ParseRule("prime(5)").getOutput();
+  solver->solveBackward(target1);
+
+  auto res1 = solver->next();
+  solver->done();
+
+  ASSERT_TRUE(res1);
+
+  auto target2 = RuleParser().ParseRule("prime(12)").getOutput();
+  solver->solveBackward(target2);
+
+  auto res2 = solver->next();
+  solver->done();
+
+  ASSERT_FALSE(res2);
 }

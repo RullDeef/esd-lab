@@ -82,6 +82,7 @@ protected:
       if (numBound == 3) {
         if (verifyResult(args[0], args[1], args[2]))
           output->put(std::move(subst));
+        return;
       } else if (args[2]->isVariable()) // if result is not bound - compute it
         computeResult(args[0], args[1], args[2], subst);
       else if (args[0]->isVariable()) // if first arg is not bound - compute it

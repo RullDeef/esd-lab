@@ -17,3 +17,14 @@ mul(_, 0, 0).
 mul(s(0), x, x).
 mul(s(x), s(y), z) :- mul(x, y, r), sum(r, x, w), sum(s(y), w, z).
 
+#
+# x is divisible by y
+#
+divisible_by(x, y) :- mul(y, z, x), mul(y, z, x), !.
+
+is_composite(x) :- in_range(v, 2, x), divisible_by(x, v), !.
+
+prime(1) :- !, fail.
+prime(x) :- is_composite(x), !, fail.
+prime(_).
+
