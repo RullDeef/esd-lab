@@ -2,7 +2,6 @@
 #include "../utils.h"
 #include <algorithm>
 #include <cctype>
-#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -268,6 +267,7 @@ Expr::ptr Expr::withRenamedVariable(const std::string &oldName,
       newOperands.push_back(op->withRenamedVariable(oldName, newName));
     return std::make_shared<Expr>(type, std::move(newOperands), newVars);
   }
+  return nullptr;
 }
 
 Expr::ptr Expr::withReplacedVariable(const std::string &varName, ptr term) {
@@ -304,6 +304,7 @@ Expr::ptr Expr::withReplacedVariable(const std::string &varName, ptr term) {
     }
     return std::make_shared<Expr>(type, std::move(newOperands), vars);
   }
+  return nullptr;
 }
 
 Expr::ptr Expr::toNormalForm() {
@@ -327,6 +328,7 @@ Expr::ptr Expr::toNormalForm() {
   case Type::forall:
     return quantifierToNormalForm();
   }
+  return nullptr;
 }
 
 Expr::ptr Expr::inverseToNormalForm() {
@@ -360,6 +362,7 @@ Expr::ptr Expr::inverseToNormalForm() {
         operands[0]->vars,
         createInverse(operands[0]->operands[0])->toNormalForm());
   }
+  return nullptr;
 }
 
 Expr::ptr Expr::conjunctionToNormalForm() {

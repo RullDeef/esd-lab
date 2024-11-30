@@ -1,7 +1,7 @@
 #include "normalizer.h"
 #include "parser/expr.h"
 #include "parser/expr_parser.h"
-#include "resolver_new.h"
+#include "resolver.h"
 #include <exception>
 #include <iostream>
 #include <sstream>
