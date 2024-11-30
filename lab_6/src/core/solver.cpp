@@ -2,25 +2,37 @@
 #include "channel.h"
 #include "database.h"
 #include "subst.h"
+#include <memory>
 #include <optional>
+#include <thread>
 
-Solver::Solver(const Database &database) : m_database(database) {}
+Solver::Solver(std::shared_ptr<Database> database)
+    : m_database(std::move(database)) {}
 
 Solver::~Solver() { done(); }
 
 void Solver::solveForward(Atom target) {
   done();
   m_channel = std::make_shared<Channel<Subst>>();
-  m_solverThread = std::thread([this, target = std::move(target)]() {
-    solveForwardThreaded(std::move(target), *m_channel);
-    m_channel->close();
-  });
+  m_solverThread = std::thread(
+      [this, lock = shared_from_this(), target = std::move(target)]() {
+        solveForwardThreaded(std::move(target), *m_channel);
+        m_channel->close();
+      });
 }
 
-void Solver::solveBackward(Atom target) { return; }
+void Solver::solveBackward(Atom target) {
+  done();
+  m_channel = std::make_shared<Channel<Subst>>();
+  m_solverThread = std::thread(
+      [this, lock = shared_from_this(), target = std::move(target)]() {
+        solveBackwardThreaded(std::move(target), *m_channel);
+        m_channel->close();
+      });
+}
 
 std::optional<Subst> Solver::next() {
-  if (!m_channel || m_channel->isClosed())
+  if (!m_channel)
     return std::nullopt;
   auto [subst, ok] = m_channel->get();
   return ok ? std::optional(subst) : std::nullopt;
@@ -35,23 +47,26 @@ void Solver::done() {
 
 void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
   WorkingDataset workset;
-  for (auto &fact : m_database.getFacts()) {
+  for (auto &rule : m_database->getRules()) {
+    if (!rule.isFact())
+      continue;
     // проверить, находится ли цель среди фактов в базе правил
     Subst subst;
-    if (unify(fact, target, subst)) {
+    if (unify(rule.getOutput(), target, subst)) {
       bool wasEmpty = subst.empty();
-      output.put(std::move(subst));
+      if (!output.put(std::move(subst)))
+        return;
       // завершить поиск если была сгенерирована пустая подстановка
       if (wasEmpty)
         return;
     }
-    workset.addFact(fact);
+    workset.addFact(rule.getOutput());
   }
   bool newAdded = true;
   while (newAdded) {
     newAdded = false;
     workset.nextIteration(); // обновить счетчик шага
-    for (auto &rule : m_database.getRules()) {
+    for (auto &rule : m_database->getRules()) {
       // проверить, что входы правила содержат атом из доказанных на
       // предыдущем шаге
       bool hasNewFacts = false;
@@ -62,38 +77,43 @@ void Solver::solveForwardThreaded(Atom target, Channel<Subst> &output) {
       if (!hasNewFacts)
         continue;
       // проверить покрытие входов из доказанных фактов
-      auto channel = unifyInputs(rule, workset);
+      auto [worker, channel] = unifyInputs(rule, workset);
       while (true) {
         // перебираем все возможные подстановки
         auto [subst, ok] = channel->get();
         if (!ok)
           break;
-        auto newFact = applySubst(subst, rule.getOutput());
+        auto newFact = subst.apply(rule.getOutput());
         // проверить, что факт действительно новый
         if (workset.hasFact(newFact))
           continue;
         // проверить, что новый факт удовлетворяет цели
         Subst res;
-        if (unify(newFact, target, res))
-          if (!output.put(std::move(res)))
-            break;
+        if (unify(newFact, target, res)) {
+          if (!output.put(std::move(res))) {
+            channel->close();
+            return;
+          }
+        }
         workset.addFact(newFact);
         newAdded = true;
       }
+      channel->close();
     }
   }
 }
 
-std::shared_ptr<Channel<Subst>> Solver::unifyInputs(const Rule &rule,
-                                                    WorkingDataset &workset) {
+void Solver::solveBackwardThreaded(Atom target, Channel<Subst> &output) {}
+
+TaskChanPair<Subst> Solver::unifyInputs(const Rule &rule,
+                                        WorkingDataset &workset) {
   auto channel = std::make_shared<Channel<Subst>>();
-  std::thread worker([&rule, &workset, channel]() {
+  std::jthread worker([&rule, &workset, channel]() {
     auto inputs = rule.getInputs();
     unifyRest(inputs.begin(), inputs.end(), workset, Subst(), *channel);
     channel->close();
   });
-  worker.detach();
-  return channel;
+  return std::make_pair(std::move(worker), channel);
 }
 
 bool Solver::unifyRest(std::vector<Atom>::const_iterator begin,
@@ -101,7 +121,7 @@ bool Solver::unifyRest(std::vector<Atom>::const_iterator begin,
                        WorkingDataset &workset, const Subst &prev,
                        Channel<Subst> &channel, bool wasNewFact) {
   if (begin == end)
-    return !wasNewFact || channel.put(prev);
+    return !wasNewFact || (!channel.isClosed() && channel.put(prev));
   // проверить все возможные факты для данного атома, если нашли совпадение -
   // проверяем следующие атомы
   auto &curr = *begin++;
@@ -122,24 +142,31 @@ bool Solver::unify(const Atom &left, const Atom &right, Subst &subst) {
   auto &args2 = right.getArguments();
   if (args1.size() != args2.size())
     return false;
-  for (size_t i = 0; i < args1.size(); ++i) {
-    if (!isVar(args1[i]) && !isVar(args2[i])) {
-      if (args1[i] != args2[i])
-        return false;
-    } else if (isVar(args1[i])) {
-      if (!subst.insert(args1[i], args2[i]))
-        return false;
-    } else {
-      if (!subst.insert(args2[i], args1[i]))
-        return false;
-    }
-  }
+  for (size_t i = 0; i < args1.size(); ++i)
+    if (!unify(args1[i], args2[i], subst))
+      return false;
   return true;
 }
 
-Atom Solver::applySubst(const Subst &subst, const Atom &atom) {
-  auto args = atom.getArguments();
-  for (auto &arg : args)
-    arg = subst.apply(arg);
-  return Atom(atom.getName(), std::move(args));
+bool Solver::unify(Variable::ptr left, Variable::ptr right, Subst &subst) {
+  if (left->isConst() && right->isConst())
+    return left->getValue() == right->getValue();
+  if (left->isVariable() && !right->isVariable())
+    return subst.insert(left->getValue(), right);
+  if (!left->isVariable() && right->isVariable())
+    return subst.insert(right->getValue(), left);
+  if (left->isVariable() && right->isVariable())
+    return left->getValue() == right->getValue() ||
+           subst.link(left->getValue(), right->getValue());
+  // унификация функциональных символов
+  if (left->getValue() != right->getValue())
+    return false;
+  const auto &args1 = left->getArguments();
+  const auto &args2 = right->getArguments();
+  if (args1.size() != args2.size())
+    return false;
+  for (int i = 0; i < args1.size(); ++i)
+    if (!unify(args1[i], args2[i], subst))
+      return false;
+  return true;
 }

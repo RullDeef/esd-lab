@@ -1,14 +1,20 @@
 #pragma once
 
+#include "name_allocator.h"
+#include "variable.h"
+#include <set>
 #include <string>
 #include <vector>
 
 class Atom {
 public:
-  Atom(std::string name = "?", std::vector<std::string> arguments = {});
+  Atom(std::string name = "?", std::vector<Variable::ptr> arguments = {});
 
   const std::string &getName() const { return m_name; }
-  const std::vector<std::string> &getArguments() const { return m_arguments; }
+  const std::vector<Variable::ptr> &getArguments() const { return m_arguments; }
+
+  Atom renamedVars(NameAllocator &allocator) const;
+  std::set<std::string> getAllVars() const;
 
   std::string toString() const;
 
@@ -18,12 +24,8 @@ public:
 
 private:
   std::string m_name;
-  std::vector<std::string> m_arguments;
+  std::vector<Variable::ptr> m_arguments;
 };
-
-static inline bool isVar(const std::string &name) {
-  return name.size() > 0 && std::isalpha(name[0]) && !std::isupper(name[0]);
-}
 
 namespace std {
 static inline string to_string(const Atom &atom) { return atom.toString(); }

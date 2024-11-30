@@ -1,11 +1,13 @@
 #include "database.h"
 #include "name_allocator.h"
 #include "parser.h"
+#include "variable.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 
 Database::Database(const char *filename) {
   if (filename == nullptr)
@@ -25,23 +27,15 @@ Database::Database(const char *filename) {
       auto rule = RuleParser().ParseRule(line.c_str());
       addRule(rule);
     } catch (std::exception &errRule) {
-      try {
-        auto fact = RuleParser().ParseFact(line.c_str());
-        addFact(fact);
-      } catch (std::exception &errFact) {
-        std::cerr << filename << ":" << lineNumber << ": parse error:\n"
-                  << "  if rule: " << errRule.what() << "\n"
-                  << "  if fact: " << errFact.what() << std::endl;
-      }
+      std::cerr << filename << ":" << lineNumber
+                << ": parse error: " << errRule.what() << std::endl;
     }
   }
 }
 
 size_t Database::rulesCount() const { return m_rules.size(); }
-size_t Database::factsCount() const { return m_facts.size(); }
 
 const std::list<Rule> &Database::getRules() const { return m_rules; }
-const std::list<Atom> &Database::getFacts() const { return m_facts; }
 
 const Rule &Database::getRule(size_t index) const {
   auto iter = m_rules.begin();
@@ -49,35 +43,35 @@ const Rule &Database::getRule(size_t index) const {
   return *iter;
 }
 
-const Atom &Database::getFact(size_t index) const {
-  auto iter = m_facts.begin();
-  std::advance(iter, index);
-  return *iter;
-}
-
 const Rule &Database::addRule(const Rule &rule) {
   auto inputs = rule.getInputs();
-  auto output = rule.getOutput();
-  for (size_t i = 0; i < inputs.size(); ++i) {
-    std::vector<std::string> args;
-    for (auto &var : inputs[i].getArguments())
-      args.push_back(isVar(var) ? m_allocator.allocateRenaming(var) : var);
-    inputs[i] = Atom(inputs[i].getName(), std::move(args));
-  }
-  std::vector<std::string> args;
-  for (auto &var : output.getArguments())
-    args.push_back(isVar(var) ? m_allocator.allocateRenaming(var) : var);
+  for (size_t i = 0; i < inputs.size(); ++i)
+    inputs[i] = renameVars(inputs[i]);
+  auto output = renameVars(rule.getOutput());
   m_allocator.commit();
-  output = Atom(output.getName(), std::move(args));
   auto newRule = Rule(std::move(inputs), std::move(output));
-  std::cout << ":- " << newRule.toString() << std::endl;
+  std::cout << ">> " << newRule.toString() << std::endl;
   m_rules.push_back(std::move(newRule));
   return m_rules.back();
 }
 
-void Database::addFact(const Atom &fact) {
-  std::cout << ":- " << fact.toString() << std::endl;
-  m_facts.push_back(fact);
+Atom Database::renameVars(const Atom &atom) {
+  std::vector<Variable::ptr> args;
+  for (auto &arg : atom.getArguments())
+    args.push_back(renameVars(arg));
+  return Atom(atom.getName(), std::move(args));
+}
+
+Variable::ptr Database::renameVars(const Variable::ptr &var) {
+  if (var->isConst())
+    return var;
+  if (var->isVariable())
+    return Variable::createVariable(
+        m_allocator.allocateRenaming(var->getValue()));
+  std::vector<Variable::ptr> args;
+  for (auto &arg : var->getArguments())
+    args.push_back(renameVars(arg));
+  return Variable::createFuncSym(var->getValue(), std::move(args));
 }
 
 void WorkingDataset::addFact(Atom fact) {

@@ -4,10 +4,15 @@
 
 class Rule {
 public:
-  Rule(std::vector<Atom> inputs = {{}}, Atom output = {});
+  Rule(std::vector<Atom> inputs = {}, Atom output = {});
+
+  Rule(Atom output);
 
   const std::vector<Atom> &getInputs() const { return m_inputs; }
   const Atom &getOutput() const { return m_output; }
+
+  bool isFact() const { return m_inputs.empty(); }
+  bool mightProve(const Atom &target) const;
 
   std::string toString() const;
 

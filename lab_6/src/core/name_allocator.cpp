@@ -4,6 +4,8 @@
 #include <stdexcept>
 
 bool NameAllocator::allocateName(std::string name) {
+  if (name == "_")
+    return true;
   auto [base, index] = splitIndexed(std::move(name));
   if (m_allocated.count(base) == 0) {
     m_allocated[base] = std::list{index};
@@ -18,6 +20,8 @@ bool NameAllocator::allocateName(std::string name) {
 }
 
 std::string NameAllocator::allocateRenaming(std::string original) {
+  if (original == "_")
+    return original;
   if (m_working.count(original) != 0)
     return m_working[original];
   auto [base, index] = splitIndexed(original);
@@ -41,6 +45,8 @@ std::string NameAllocator::allocateRenaming(std::string original) {
 void NameAllocator::commit() { m_working.clear(); }
 
 void NameAllocator::deallocate(std::string name) {
+  if (name == "_")
+    return;
   auto [base, index] = splitIndexed(std::move(name));
   if (m_allocated.count(base) == 0)
     return;

@@ -2,6 +2,7 @@
 
 #include "name_allocator.h"
 #include "rule.h"
+#include "variable.h"
 #include <list>
 
 class Database {
@@ -9,23 +10,17 @@ public:
   explicit Database(const char *filename = nullptr);
 
   size_t rulesCount() const;
-  size_t factsCount() const;
-
   const Rule &getRule(size_t index) const;
-  const Atom &getFact(size_t index) const;
-
   const std::list<Rule> &getRules() const;
-  const std::list<Atom> &getFacts() const;
 
   // добавить правило в базу данных, переименовывая переменные
   const Rule &addRule(const Rule &rule);
 
-  void addFact(const Atom &fact);
-
 private:
-  std::list<Rule> m_rules;
-  std::list<Atom> m_facts;
+  Atom renameVars(const Atom &atom);
+  Variable::ptr renameVars(const Variable::ptr &var);
 
+  std::list<Rule> m_rules;
   NameAllocator m_allocator;
 };
 

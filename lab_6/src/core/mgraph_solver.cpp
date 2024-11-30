@@ -75,9 +75,6 @@ MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
                        baseSubst = std::move(baseSubst),
                        allocator = std::move(allocator), output]() {
     for (auto &rule : m_database->getRules()) {
-      // std::cout << "(OR) target: " << target.toString() << ". checking rule "
-      //           << rule.toString() << std::endl;
-      // std::this_thread::sleep_for(std::chrono::seconds(1));
       if (output->isClosed()) {
         break;
       }
@@ -102,7 +99,6 @@ MGraphSolver::generateOrBasic(Atom target, Subst baseSubst,
         if (!ok)
           break;
         if (subst2.cut) {
-          // std::cout << "was cut!\n";
           wasCut = true;
         } else if (!output->put({std::move(subst2.subst), false})) {
           mid->close();
