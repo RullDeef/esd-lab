@@ -179,6 +179,28 @@ void GraphSearch::Mark(int node) {
 }
 \end{lstlisting}
 
+\section{Сборка ПО}
+
+Для сборки программы используется \texttt{CMake}. Стандартная последовательность команд для сборки и запуска программы:
+
+\begin{verbatim}
+mkdir build && cd build
+cmake ..
+# сборка и запуск программы
+make app
+./app
+# опциональная сборка и запуск юнит-тестов
+make unittests
+./unittests
+\end{verbatim}
+
+Альтернативно, можно собрать и запустить программу с помощью \texttt{makefile} скрипта в корневой папке:
+
+\begin{verbatim}
+make app
+./app
+\end{verbatim}
+
 \clearpage
 
 \section{Тестирование ПО}
