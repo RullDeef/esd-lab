@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <memory>
 
 Database::Database(const char *filename) {
   if (filename == nullptr)
@@ -21,6 +20,7 @@ Database::Database(const char *filename) {
   std::string line;
   while (std::getline(file, line)) {
     lineNumber++;
+    // пропустить пустые строки и комментарии, начинающиеся с символа '#'
     if (line.empty() || line[0] == '#')
       continue;
     try {

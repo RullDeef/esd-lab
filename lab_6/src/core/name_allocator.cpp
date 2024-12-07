@@ -44,21 +44,6 @@ std::string NameAllocator::allocateRenaming(std::string original) {
 
 void NameAllocator::commit() { m_working.clear(); }
 
-void NameAllocator::deallocate(std::string name) {
-  if (name == "_")
-    return;
-  auto [base, index] = splitIndexed(std::move(name));
-  if (m_allocated.count(base) == 0)
-    return;
-  auto &indexList = m_allocated[base];
-  auto pos = std::find(indexList.begin(), indexList.end(), index);
-  if (pos != indexList.end()) {
-    indexList.erase(pos);
-    if (indexList.empty())
-      m_allocated.erase(base);
-  }
-}
-
 std::string NameAllocator::toString() const {
   std::string res = "{";
   bool first = true;

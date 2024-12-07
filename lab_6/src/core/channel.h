@@ -5,6 +5,7 @@
 #include <mutex>
 #include <stdexcept>
 
+// класс представляющий буферизированный канал. Не используется в данной работе.
 template <typename T> class ChannelBuf {
 public:
   ChannelBuf(size_t capacity = 1) : m_capacity(capacity) {
@@ -59,7 +60,12 @@ private:
   std::condition_variable m_condPut;
 };
 
-// unbuffered channel
+// класс небуферизованного канала.
+//
+// Реализует методы записи в канал и чтения из канала. Во время записи
+// происходит блокировка до момента чтения из другого потока. Аналогично при
+// попытке чтения происходит блокировка до тех пор, пока другой поток не запишет
+// значение в этот канал
 template <typename T> class Channel {
 public:
   ~Channel() { close(); }

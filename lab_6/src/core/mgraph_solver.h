@@ -10,12 +10,7 @@
 
 class MGraphSolver : public Solver {
 public:
-  struct AtomEx {
-    Atom atom;
-    std::list<Rule>::const_iterator label;
-    AtomEx() = delete;
-  };
-
+  // структура подстановки с флагом отсечения
   struct SubstEx {
     Subst subst;
     bool cut;
@@ -30,8 +25,6 @@ protected:
                                      Channel<Subst> &output) override;
 
 private:
-  // checks hooks table and executes hooks if any,
-  // otherwise fallbacks to basic 'generateOr'
   TaskChanPair<SubstEx> generateOr(Atom target, Subst baseSubst,
                                    NameAllocator allocator);
 
@@ -41,5 +34,6 @@ private:
   TaskChanPair<SubstEx> generateAnd(std::vector<Atom> targets, Subst baseSubst,
                                     NameAllocator allocator);
 
+  // таблица обработчиков специальных процедур
   std::map<std::string, std::shared_ptr<AtomHook>> m_atomHooks;
 };

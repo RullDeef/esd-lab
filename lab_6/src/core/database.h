@@ -5,6 +5,9 @@
 #include "variable.h"
 #include <list>
 
+// класс, хранящий базу правил.
+//
+// Загружает базу из файла при указании имени файла в конструкторе
 class Database {
 public:
   explicit Database(const char *filename = nullptr);
@@ -20,12 +23,15 @@ private:
   Atom renameVars(const Atom &atom);
   Variable::ptr renameVars(const Variable::ptr &var);
 
-  std::list<Rule> m_rules;
-  NameAllocator m_allocator;
+  std::list<Rule> m_rules;   // список правил базы
+  NameAllocator m_allocator; // контейнер использованных имен переменных
 };
 
+// класс, представляющий рабочее множество. Используется только при прямом
+// выводе.
 class WorkingDataset {
 public:
+  // расширенный класс атома с номером поколения
   class AtomEx : public Atom {
   public:
     AtomEx(Atom &&atom, size_t gen = 0) : Atom(atom), m_gen(gen) {}

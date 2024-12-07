@@ -13,6 +13,7 @@ public:
   const std::string &getName() const { return m_name; }
   const std::vector<Variable::ptr> &getArguments() const { return m_arguments; }
 
+  // возвращает новый атом с переименованными переменными
   Atom renamedVars(NameAllocator &allocator) const;
   std::set<std::string> getAllVars() const;
 

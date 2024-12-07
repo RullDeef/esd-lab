@@ -11,6 +11,9 @@
 #include <sstream>
 #include <string>
 
+/**
+ * Абстрактный класс обработчика специальной процедуры.
+ */
 class AtomHook {
 public:
   AtomHook(const char *name) : m_name(name) {}
@@ -18,8 +21,7 @@ public:
 
   const char *getName() const { return m_name; }
 
-  // returns worker thread and output solutions channel.
-  // Can define arbitrary logic for proving this atom hook
+  // Метод доказательства специальной процедуры в отдельном потоке
   TaskChanPair<Subst> prove(std::vector<Variable::ptr> args, Subst subst) {
     auto output = std::make_shared<Channel<Subst>>();
     std::jthread worker(
@@ -31,14 +33,18 @@ public:
   }
 
 protected:
+  // виртуальный метод доказательства специальной процедуры, реализуемый в
+  // классах-наследниках
   virtual void proveThreaded(std::vector<Variable::ptr> args, Subst subst,
                              std::shared_ptr<Channel<Subst>> output) = 0;
 
 private:
-  const char *m_name;
+  const char *m_name; // имя специальной процедуры
 };
 
-// pre-defined hooks
+// класс обработчика процедуры write(...).
+//
+// Выводит на экран значения переменных и генерирует одну подстановку
 class WriteHook : public AtomHook {
 public:
   WriteHook() : AtomHook("write") {}
@@ -60,6 +66,13 @@ protected:
   }
 };
 
+// базовый класс обработчика трехаргументного предиката над целыми числами вида
+//
+// predicate(a, b, c) <=> (a OP b = c)
+//
+// где OP - некоторая бинарная операция. Предикат может быть использован для
+// проверки истинности равенства в случае, если все входные переменные связаны
+// со значениями и для определения третьего неизвестного
 class IntOp3Hook : public AtomHook {
 public:
   using op = std::function<int(int, int)>;
@@ -133,6 +146,7 @@ private:
   op m_opInvSecond;
 };
 
+// класс предиката add(a, b, c) <=> (a + b = c)
 class IntAddHook : public IntOp3Hook {
 public:
   IntAddHook()
@@ -142,6 +156,7 @@ public:
             [](int first, int res) { return res - first; }) {}
 };
 
+// класс предиката mul(a, b, c) <=> (a * b = c)
 class IntMulHook : public IntOp3Hook {
 public:
   IntMulHook()
@@ -151,6 +166,7 @@ public:
             [](int first, int res) { return res / first; }) {}
 };
 
+// класс предиката leq(a, b) <=> (a <= b)
 class LeqHook : public AtomHook {
 public:
   LeqHook() : AtomHook("leq") {}
@@ -169,7 +185,6 @@ protected:
     try {
       int left = std::stoi(args[0]->getValue());
       int right = std::stoi(args[1]->getValue());
-      std::cout << "comparing " << left << " and " << right << std::endl;
       if (left <= right)
         output->put(subst);
     } catch (...) {
@@ -177,8 +192,10 @@ protected:
   }
 };
 
-// in_range(var, start, end) <=> (start <= var < end)
-// or act as a generator for free variable var
+// класс предиката in_range(var, start, end) <=> (start <= var < end)
+//
+// Может генерировать множество подстановок для переменной var из полуинтервала
+// [start, end), если она не связана со значением
 class InRangeHook : public AtomHook {
 public:
   InRangeHook() : AtomHook("in_range") {}
