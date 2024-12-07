@@ -1,9 +1,8 @@
-O(N, M1)
-M(M1)
-A(W)
-E(N, A1)
-A(x) & W(y) & S(x, y, z) & H(z) -> C(x)
-M(x) & O(N, x) -> S(W, x, N)
-M(x) -> W(x)
-E(x, A1) -> H(x)
-
+O(N, M1).
+M(M1).
+A(W).
+E(N, A1).
+A(x) & W(y) & S(x, y, z) & H(z) -> C(x).
+M(x) & O(N, x) -> S(W, x, N).
+M(x) -> W(x).
+E(x, A1) -> H(x).
