@@ -1,0 +1,76 @@
+contains(cons(x, _), x) :- !.
+contains(cons(_, rest), x) :- contains(rest, x).
+
+all_unique(Nil).
+all_unique(cons(x, rest)) :- contains(rest, x), !, fail.
+all_unique(cons(x, rest)) :- all_unique(rest).
+
+all_in_range(Nil, _, _).
+all_in_range(cons(x, rest), s, e) :- in_range(x, s, e), all_in_range(rest, s, e).
+
+all_rows_in_range(Nil, _, _).
+all_rows_in_range(cons(row, rest), s, e) :- all_in_range(row, s, e), all_rows_in_range(rest, s, e).
+
+all_rows_unique(Nil).
+all_rows_unique(cons(row, rest)) :- all_unique(row), all_rows_unique(rest).
+
+board_to_list(board(
+  x11, x12, x13, x14, x15, x16, x17, x18, x19,
+  x21, x22, x23, x24, x25, x26, x27, x28, x29,
+  x31, x32, x33, x34, x35, x36, x37, x38, x39,
+  x41, x42, x43, x44, x45, x46, x47, x48, x49,
+  x51, x52, x53, x54, x55, x56, x57, x58, x59,
+  x61, x62, x63, x64, x65, x66, x67, x68, x69,
+  x71, x72, x73, x74, x75, x76, x77, x78, x79,
+  x81, x82, x83, x84, x85, x86, x87, x88, x89,
+  x91, x92, x93, x94, x95, x96, x97, x98, x99
+), cons(cons(x11, cons(x12, cons(x13, cons(x14, cons(x15, cons(x16, cons(x17, cons(x18, cons(x19,
+   cons(cons(x21, cons(x22, cons(x23, cons(x24, cons(x25, cons(x26, cons(x27, cons(x28, cons(x29,
+   cons(cons(x31, cons(x32, cons(x33, cons(x34, cons(x35, cons(x36, cons(x37, cons(x38, cons(x39,
+   cons(cons(x41, cons(x42, cons(x43, cons(x44, cons(x45, cons(x46, cons(x47, cons(x48, cons(x49,
+   cons(cons(x51, cons(x52, cons(x53, cons(x54, cons(x55, cons(x56, cons(x57, cons(x58, cons(x59,
+   cons(cons(x61, cons(x62, cons(x63, cons(x64, cons(x65, cons(x66, cons(x67, cons(x68, cons(x69,
+   cons(cons(x71, cons(x72, cons(x73, cons(x74, cons(x75, cons(x76, cons(x77, cons(x78, cons(x79,
+   cons(cons(x81, cons(x82, cons(x83, cons(x84, cons(x85, cons(x86, cons(x87, cons(x88, cons(x89,
+   cons(cons(x91, cons(x92, cons(x93, cons(x94, cons(x95, cons(x96, cons(x97, cons(x98, cons(x99,
+   Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))).
+
+print_board(board(
+  x11, x12, x13, x14, x15, x16, x17, x18, x19,
+  x21, x22, x23, x24, x25, x26, x27, x28, x29,
+  x31, x32, x33, x34, x35, x36, x37, x38, x39,
+  x41, x42, x43, x44, x45, x46, x47, x48, x49,
+  x51, x52, x53, x54, x55, x56, x57, x58, x59,
+  x61, x62, x63, x64, x65, x66, x67, x68, x69,
+  x71, x72, x73, x74, x75, x76, x77, x78, x79,
+  x81, x82, x83, x84, x85, x86, x87, x88, x89,
+  x91, x92, x93, x94, x95, x96, x97, x98, x99)) :-
+  write("Solution:"),
+  write(x11, x12, x13, x14, x15, x16, x17, x18, x19),
+  write(x21, x22, x23, x24, x25, x26, x27, x28, x29),
+  write(x31, x32, x33, x34, x35, x36, x37, x38, x39),
+  write(x41, x42, x43, x44, x45, x46, x47, x48, x49),
+  write(x51, x52, x53, x54, x55, x56, x57, x58, x59),
+  write(x61, x62, x63, x64, x65, x66, x67, x68, x69),
+  write(x71, x72, x73, x74, x75, x76, x77, x78, x79),
+  write(x81, x82, x83, x84, x85, x86, x87, x88, x89),
+  write(x91, x92, x93, x94, x95, x96, x97, x98, x99).
+
+eq(x, x).
+
+solve :-
+  eq(board, board(
+    _, _, _, 2, 6, _, 7, _, 1,
+    6, 8, _, _, 7, _, _, 9, _,
+    1, 9, _, _, _, 4, 5, _, _,
+    8, 2, _, 1, _, _, _, 4, _,
+    _, _, 4, 6, _, 2, 9, _, _,
+    _, 5, _, _, _, 3, _, 2, 8,
+    _, _, 9, 3, _, _, _, 7, 4,
+    _, 4, _, _, 5, _, _, 3, 6,
+    7, _, 3, _, 1, 8, _, _, _
+  )),
+  board_to_list(board, board_list),
+  all_rows_in_range(board_list, 1, 10),
+  all_rows_unique(board_list),
+  print_board(board).
