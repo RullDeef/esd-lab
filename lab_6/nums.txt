@@ -1,9 +1,9 @@
 #
 # sum(x, y, z) <=> z = x + y
 #
-sum(0, x, x).
-sum(x, 0, x).
-sum(s(x), s(y), s(s(z))) :- sum(x, y, z).
+# sum(0, x, x).
+# sum(x, 0, x).
+# sum(s(x), s(y), s(s(z))) :- sum(x, y, z).
 
 #
 # mul(x, y, z) <=> z = x * y
@@ -12,10 +12,10 @@ sum(s(x), s(y), s(s(z))) :- sum(x, y, z).
 #       = (x - 1) * (y - 1) + x - 1 + y - 1 + 1
 #       = (x - 1) * (y - 1) + (x - 1) + y
 #
-mul(0, _, 0).
-mul(_, 0, 0).
-mul(s(0), x, x).
-mul(s(x), s(y), z) :- mul(x, y, r), sum(r, x, w), sum(s(y), w, z).
+# mul(0, _, 0).
+# mul(_, 0, 0).
+# mul(s(0), x, x).
+# mul(s(x), s(y), z) :- mul(x, y, r), sum(r, x, w), sum(s(y), w, z).
 
 #
 # x is divisible by y

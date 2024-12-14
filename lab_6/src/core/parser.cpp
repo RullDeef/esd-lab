@@ -136,7 +136,7 @@ bool RuleParser::Eat(const char *value) {
 }
 
 bool RuleParser::SkipWhitespace() {
-  while (m_source[m_pos] && m_source[m_pos] == ' ')
+  while (m_source[m_pos] && (m_source[m_pos] == ' ' || m_source[m_pos] == '\t' || m_source[m_pos] == '\n'))
     m_pos++;
   return m_source[m_pos] != '\0';
 }

@@ -17,14 +17,18 @@ Database::Database(const char *filename) {
     return;
   }
   int lineNumber = 0;
-  std::string line;
+  std::string line, ruleStr;
   while (std::getline(file, line)) {
     lineNumber++;
     // пропустить пустые строки и комментарии, начинающиеся с символа '#'
     if (line.empty() || line[0] == '#')
       continue;
+    ruleStr += line;
+    if (line[line.size() - 1] != '.')
+      continue;
     try {
-      auto rule = RuleParser().ParseRule(line.c_str());
+      auto rule = RuleParser().ParseRule(ruleStr.c_str());
+      ruleStr = "";
       addRule(rule);
     } catch (std::exception &errRule) {
       std::cerr << filename << ":" << lineNumber
